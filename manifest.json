@@ -2,7 +2,7 @@
   "name": "TAN",
   "short_name": "TAN",
   "description": "TAN 工作室工作台",
-  "start_url": "/index.html",
+  "start_url": "/tan-app/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F5E6E6",
