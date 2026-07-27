@@ -306,6 +306,14 @@
   .mood-btn{width:42px;height:42px;border-radius:12px;background:#FAF3F3;border:1px solid var(--line);font-size:20px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
   .mood-btn:hover{transform:scale(1.1)}
   .mood-btn.sel{background:var(--butter);border-color:var(--clay);transform:scale(1.05)}
+  .photo-row{display:flex;gap:10px}
+  .photo-box{width:90px;height:90px;border-radius:12px;border:2px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:all .15s;background:#FAF3F3}
+  .photo-box:hover{border-color:var(--clay)}
+  .photo-box span{font-size:24px;color:var(--ink3)}
+  .photo-box small{font-size:11px;color:var(--ink3);margin-top:2px}
+  .photo-box .photo-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer}
+  .photo-thumbs{display:flex;gap:6px;margin-top:6px}
+  .photo-thumbs img{width:50px;height:50px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
 
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
   .gal-item{background:var(--card);border-radius:var(--radius);padding:14px;border:1px solid rgba(232,216,216,.5);cursor:pointer;transition:all .15s}
@@ -408,6 +416,7 @@
    ============================================================ */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+let photoTemp = {};
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const today = () => new Date().toISOString().slice(0,10);
 const now = () => new Date().toISOString().slice(0,16);
@@ -535,6 +544,7 @@ function drawOrders(filter){
           ${o.deliveryType==='delivery'&&o.address?`<span>📍 ${escape(o.address)}</span>`:''}
         </div>
         ${o.card?`<div class="li-sub" style="margin-top:4px;color:var(--ink2)">💌 ${escape(o.card)}</div>`:''}
+        ${(o.photo1||o.photo2)?`<div class="photo-thumbs"><img src="${o.photo1||''}" ${o.photo1?'':'hidden'}><img src="${o.photo2||''}" ${o.photo2?'':'hidden'}></div>`:''}
         ${o.note?`<div class="li-sub" style="margin-top:4px">📝 ${escape(o.note)}</div>`:''}
       </div>
       <div class="li-actions">
@@ -558,6 +568,7 @@ function drawOrders(filter){
 }
 function orderForm(id){
   const o = id ? DB.orders.find(x=>x.id===id) : {};
+  photoTemp = {1: '', 2: ''};
   const body = `
     <div class="form-row r2">
       <div class="field"><label>订单时间</label><input type="date" id="f_orderDate" value="${o.orderDate||today()}"></div>
@@ -576,6 +587,18 @@ function orderForm(id){
       <div class="field"><label>配送地址（配送时填）</label><input type="text" id="f_address" value="${escape(o.address||'')}"></div>
     </div>
     <div class="field" style="margin-top:10px"><label>卡片内容</label><textarea id="f_card" placeholder="写在花束卡片上的话">${escape(o.card||'')}</textarea></div>
+    <div class="field" style="margin-top:10px"><label>花束照片</label>
+      <div class="photo-row">
+        <label class="photo-box" id="photoBox1" style="${o.photo1?'background-image:url('+o.photo1+');background-size:cover;background-position:center':''}">
+          ${o.photo1?'':'<span>+</span><small>照片1</small>'}
+          <input type="file" accept="image/*" class="photo-input" data-idx="1" style="display:none">
+        </label>
+        <label class="photo-box" id="photoBox2" style="${o.photo2?'background-image:url('+o.photo2+');background-size:cover;background-position:center':''}">
+          ${o.photo2?'':'<span>+</span><small>照片2</small>'}
+          <input type="file" accept="image/*" class="photo-input" data-idx="2" style="display:none">
+        </label>
+      </div>
+    </div>
     <div class="field" style="margin-top:10px"><label>备注</label><textarea id="f_note" placeholder="其他备注信息">${escape(o.note||'')}</textarea></div>
   `;
   openModal(id?'编辑订单':'新建订单', body,
@@ -592,11 +615,48 @@ function orderForm(id){
       address: $('#f_address').value.trim(),
       card: $('#f_card').value.trim(),
       note: $('#f_note').value.trim(),
+      photo1: photoTemp[1] || (id ? o.photo1 : '') || '',
+      photo2: photoTemp[2] || (id ? o.photo2 : '') || '',
     };
+    photoTemp = {};
     if(id){ Object.assign(o, data); }
     else { DB.orders.push({id:uid(), createdAt:now(), doneDate: data.status==='done'?now():null, ...data}); }
     saveDB(); closeModal(); renderOrders(); toast(id?'已更新':'已添加');
   });
+  // 图片上传
+  document.querySelectorAll('.photo-input').forEach(inp => {
+    inp.addEventListener('change', function(){
+      const file = this.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const idx = inp.dataset.idx;
+        photoTemp[idx] = e.target.result;
+        const box = document.getElementById('photoBox'+(idx));
+        box.style.backgroundImage = 'url('+e.target.result+')';
+        box.style.backgroundSize = 'cover';
+        box.style.backgroundPosition = 'center';
+        box.innerHTML = '<small class="photo-del" data-idx="'+idx+'">✕</small>';
+        // 删除按钮
+        box.querySelector('.photo-del').addEventListener('click', function(ev){
+          ev.stopPropagation(); ev.preventDefault();
+          photoTemp[idx] = '';
+          box.style.backgroundImage = '';
+          box.innerHTML = '<span>+</span><small>照片'+(idx)+'</small>';
+          const fi = box.querySelector('input');
+          if(fi) fi.value = '';
+          initPhotoInputs();
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+  function initPhotoInputs(){
+    document.querySelectorAll('.photo-input').forEach(inp => {
+      inp.addEventListener('click', function(e){ e.stopPropagation(); });
+    });
+  }
+  initPhotoInputs();
 }
 
 /* ============================================================
