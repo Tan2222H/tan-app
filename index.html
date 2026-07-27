@@ -378,7 +378,7 @@
   <div class="ai-body">
     <div class="ai-hint">试试这样说：</div>
     <div class="ai-chips">
-      <span class="ai-chip">28号 下午4:10 配送 张三 13800138000 朝阳区xxx 粉色玫瑰</span>
+      <span class="ai-chip">28号 配送 张三 13800138000 卡片 生日快乐永远美丽 粉色玫瑰</span>
       <span class="ai-chip">花了50块进花</span>
       <span class="ai-chip">收入300 婚礼花艺</span>
       <span class="ai-chip">3月8号 妈妈生日</span>
@@ -1070,11 +1070,31 @@ const AI = {
 
       // --- 卡片 ---
       let card = '';
-      const cardM = t.match(/卡片[：:\s]*(.{2,40}?)(?:$|[,，。.!！\n]|\s{2})/);
-      if(cardM) card = cardM[1];
+      // 多种卡片表达方式：卡片 xxx / 卡片内容 xxx / 写 xxx / 祝福语 xxx / 留言 xxx
+      const cardPatterns = [
+        /卡片[：:\s]*[""「」]?(.{2,60}?)(?:[""「」]?\s*(?:$|[，,。.!！\n]|\s{2}))/,
+        /卡片内容[：:\s]*(.{2,60}?)(?:$|[，,。.!！\n]|\s{2})/,
+        /写[：:\s]*[""「」]?(.{2,60}?)(?:[""「」]?\s*(?:$|[，,。.!！\n]|\s{2}))/,
+        /祝福语[：:\s]*(.{2,60}?)(?:$|[，,。.!！\n]|\s{2})/,
+        /留言[：:\s]*(.{2,60}?)(?:$|[，,。.!！\n]|\s{2})/,
+        /卡片[：:\s]*(.{2,60})/,
+      ];
+      for(const p of cardPatterns){
+        const m = t.match(p);
+        if(m && m[1] && m[1].trim().length >= 1){
+          card = m[1].trim();
+          break;
+        }
+      }
 
       // --- 备注 ---
-      let note = t.replace(phoneM?phoneM[0]:'', '').replace(/卡片[：:\s]*.{0,40}/, '').replace(/\s+/g,' ').trim();
+      let note = t.replace(phoneM?phoneM[0]:'', '');
+      // 去掉卡片部分
+      note = note.replace(/卡片[内容]?\s*[：:\s]*[""「」]?.{0,60}?[""「」]?\s*/,'');
+      note = note.replace(/写\s*[：:\s]*[""「」]?.{0,60}?[""「」]?\s*/,'');
+      note = note.replace(/祝福语\s*[：:\s]*.{0,60}?\s*/,'');
+      note = note.replace(/留言\s*[：:\s]*.{0,60}?\s*/,'');
+      note = note.replace(/\s+/g,' ').trim();
 
       const order = {
         id:uid(), createdAt:now(), doneDate: status==='done'?now():null,
