@@ -378,12 +378,10 @@
   <div class="ai-body">
     <div class="ai-hint">试试这样说：</div>
     <div class="ai-chips">
-      <span class="ai-chip">5号有订单 粉色玫瑰 已付款</span>
+      <span class="ai-chip">28号 下午4:10 配送 张三 13800138000 朝阳区xxx 粉色玫瑰</span>
       <span class="ai-chip">花了50块进花</span>
       <span class="ai-chip">收入300 婚礼花艺</span>
       <span class="ai-chip">3月8号 妈妈生日</span>
-      <span class="ai-chip">心情很好</span>
-      <span class="ai-chip">康乃馨还剩20支</span>
     </div>
     <div class="ai-log" id="aiLog"></div>
   </div>
@@ -973,51 +971,132 @@ const AI = {
     if(!t) return null;
     const result = {raw:t, matched:[], suggestions:[]};
 
-    // 1. 订单识别：包含"订单"、"几号有"、"花"等 + 状态/款式
-    const orderMatch = /(?:订单|几号.*(?:有|来)|(?:做|订|要).*(?:花|束|捧))/.test(t) || /(玫瑰|康乃馨|百合|向日葵|郁金香|花束|捧花|花篮|开业|婚|生(?:日|日花))/.test(t);
-    if(orderMatch){
-      // 日期
-      const dateM = t.match(/(\d{1,2})月(\d{1,2})号?/) || t.match(/(\d{1,2})号/) || t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    // ========== 1. 订单识别 ==========
+    // 增强版：支持 "28号 下午4:10 配送 张三 13800138000 朝阳区xxx" 这种自由格式
+    // 也支持 "5号有订单 粉色玫瑰 已付款"
+    const hasOrderSignal = /订单|配送|自提|送花|订花|花束|捧花|花篮|开业/.test(t)
+      || /玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利/.test(t)
+      || /收花|几号.*花|什么.*花/.test(t)
+      || (/\d{1,2}号/.test(t) && /配送|送|花|收|联系|地址/.test(t));
+    
+    if(hasOrderSignal){
+      // --- 日期解析 ---
       let orderDate = today();
+      const dateM = t.match(/(\d{1,2})月(\d{1,2})[号日]/) || t.match(/(\d{1,2})[号日]/) || t.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
       if(dateM){
-        const m = dateM[1].length===4 ? dateM[2] : dateM[1];
-        const d = dateM[1].length===4 ? dateM[3] : dateM[2];
-        orderDate = `${new Date().getFullYear()}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        if(dateM[1].length===4){
+          orderDate = `${dateM[1]}-${String(dateM[2]).padStart(2,'0')}-${String(dateM[3]).padStart(2,'0')}`;
+        } else if(dateM[2]){
+          const m = dateM[1]; const d = dateM[2];
+          orderDate = `${new Date().getFullYear()}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        } else {
+          const d = dateM[1];
+          const nowM = new Date().getMonth()+1;
+          orderDate = `${new Date().getFullYear()}-${String(nowM).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        }
       }
-      // 状态
+
+      // --- 时间解析 ---
+      let useTime = '';
+      const timeM = t.match(/(?:下午|上午|中午|晚上|傍晚)?\s*(\d{1,2})[:：](\d{2})/);
+      if(timeM){
+        let h = +timeM[1];
+        const isPM = /下午|晚上|傍晚/.test(t);
+        if(isPM && h < 12) h += 12;
+        useTime = `${String(h).padStart(2,'0')}:${timeM[2]}`;
+      }
+
+      // --- 状态解析 ---
       let status='paid';
-      if(/已(?:付|付款)|定金|尾款/.test(t)) status='paid';
       if(/制作|做中|准备/.test(t)) status='making';
       if(/配(?:送|货)|发货|送到/.test(t)) status='delivery';
       if(/完成|已完|做好/.test(t)) status='done';
-      // 款式
-      const styleM = t.match(/((?:粉|红|白|黄|紫|蓝|香槟|彩色?)?(?:玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利)?(?:花束|捧花|花篮|花盒|开业花篮|桌花)?)/);
-      // 配送方式
-      const delivery = /配(?:送|货)|送到|发货/.test(t) ? 'delivery' : (/自提|到店/.test(t) ? 'pickup' : 'delivery');
-      // 联系方式
+
+      // --- 配送方式 ---
+      const delivery = /自提|到店|自己取|来拿/.test(t) ? 'pickup' : 'delivery';
+
+      // --- 联系方式（手机号） ---
       const phoneM = t.match(/1[3-9]\d{9}/);
-      // 收花人
-      const recipM = t.match(/(?:收花人|给|送)[：:\s]*([^\s,，。.!！]{1,10})/);
+
+      // --- 收花人 ---
+      let recipient = '';
+      const recipPatterns = [
+        /收花人[：:\s]*(\S{1,8})/,
+        /收花[：:\s]*(\S{1,8})/,
+        /给\s*(\S{1,8})\s*(?:送|的)/,
+        /送[给到]\s*(\S{1,8})/,
+        /联系人[：:\s]*(\S{1,8})/,
+        /(?:配送|送).*?给\s*(\S{1,8})/,
+      ];
+      for(const p of recipPatterns){
+        const m = t.match(p);
+        if(m){ recipient = m[1].replace(/[，,。.!！\s]/g,''); break; }
+      }
+      // 如果没有明确的收花人关键词，但有手机号前面的名字
+      if(!recipient && phoneM){
+        const beforePhone = t.slice(0, t.indexOf(phoneM[0]));
+        const nameM = beforePhone.match(/([^\s,，。.!！\d]{1,6})\s*$/);
+        if(nameM && !/号|月|日|点|分|配|送|自|提|收|花|地|址|联|系/.test(nameM[1])) recipient = nameM[1];
+      }
+
+      // --- 地址 ---
+      let address = '';
+      const addrPatterns = [
+        /地址[：:\s]*(\S{3,30})/,
+        /送到[：:\s]*(\S{3,30})/,
+        /配送[：:\s]*(\S{3,30})/,
+        /(?:路|街|区|楼|号|小区|大厦|广场|中心|花园|苑|城|村|镇|乡)(\S{0,20})/,
+      ];
+      for(const p of addrPatterns){
+        const m = t.match(p);
+        if(m){ address = m[1] || m[0]; break; }
+      }
+      if(!address){
+        const addrM = t.match(/([\u4e00-\u9fa5]{2,10}(?:路|街|道|巷|弄|区|楼|号|小区|大厦|广场|中心|花园|苑|城|村|镇))\s*\d*/);
+        if(addrM) address = addrM[0];
+      }
+
+      // --- 款式 ---
+      let style = '花束';
+      const stylePatterns = [
+        /((?:粉|红|白|黄|紫|蓝|香槟|橘|橙|彩色?)?\s*(?:玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利|雏菊|桔梗|勿忘我|马蹄莲)\s*(?:花束|捧花|花篮|花盒|花环|桌花|瓶插)?)/,
+        /((?:开业|婚礼|生日|求婚|表白|道歉|慰问|庆典|母亲节|父亲节|教师节|情人节)\s*(?:花篮|花束|捧花)?)/,
+        /((?:玫瑰|康乃馨|百合|向日葵|郁金香|绣球)\s*(?:花束|捧花|花篮|花盒|花环|桌花|瓶插|花)/,
+      ];
+      for(const p of stylePatterns){
+        const m = t.match(p);
+        if(m && m[1].length > 1){ style = m[1]; break; }
+      }
+
+      // --- 卡片 ---
+      let card = '';
+      const cardM = t.match(/卡片[：:\s]*(.{2,40}?)(?:$|[,，。.!！\n]|\s{2})/);
+      if(cardM) card = cardM[1];
+
+      // --- 备注 ---
+      let note = t.replace(phoneM?phoneM[0]:'', '').replace(/卡片[：:\s]*.{0,40}/, '').replace(/\s+/g,' ').trim();
 
       const order = {
         id:uid(), createdAt:now(), doneDate: status==='done'?now():null,
-        orderDate, useTime:'', style: styleM?styleM[1]:'花束',
+        orderDate, useTime, style: style||'花束',
         status, deliveryType: delivery,
-        recipient: recipM?recipM[1]:'', contact: phoneM?phoneM[0]:'',
-        address:'', card:'', note: t
+        recipient, contact: phoneM?phoneM[0]:'',
+        address, card, note
       };
       DB.orders.push(order); saveDB();
-      result.matched.push({type:'订单', desc:`${order.style} · ${ORDER_STATUS.find(s=>s.key===status).label}`});
+      let desc = `${order.style} · ${ORDER_STATUS.find(s=>s.key===status).label}`;
+      if(order.recipient) desc += ` · ${order.recipient}`;
+      if(order.useTime) desc += ` · ${order.useTime}`;
+      result.matched.push({type:'订单', desc});
     }
 
-    // 2. 记账识别：花费/收入/金额
+    // ========== 2. 记账识别 ==========
     if(/花(?:了|费|销)|支出|买|进(?:货|花)|付|充|交/.test(t) || /收入|收(?:到|入)|赚|卖/.test(t)){
       const amtM = t.match(/(\d+(?:\.\d{1,2})?)\s*(?:块|元|￥|¥|元)?/);
       if(amtM){
         const amount = +amtM[1];
         const isIncome = /收入|收到|赚|卖|进账/.test(t);
         let cat = isIncome ? '工作室收入' : '其他';
-        // 支出分类匹配
         const catMap = {'进花|花材|玫瑰|康乃馨|百合':'进花','资材|包装|丝带|花泥|纸':'资材','跑腿|外卖|配送费':'跑腿','水电|电费|水费':'水电费','房租|租金':'房租','物业':'物业费','车位|停车':'车位费','吃|饭|餐|食|咖啡':'餐饮','车|地铁|公交|打车|滴滴':'交通','买|购|淘宝|京东':'购物','玩|游戏|电影|娱乐':'娱乐','房|租':'住房','医|药|看病':'医疗','学|课|书|培训':'教育','工资|薪':'工资','理财|基金|股票':'理财'};
         if(!isIncome){
           for(const k in catMap){ if(new RegExp(k).test(t)){ cat=catMap[k]; break; } }
@@ -1030,50 +1109,21 @@ const AI = {
       }
     }
 
-    // 3. 倒计时识别：日期+生日/纪念日/节日
+    // ========== 3. 倒计时识别 ==========
     if(/生日|纪念日|结婚|过节|圣诞|元旦|新年|春节|情人|母亲节|父亲节|教师节|婚礼|纪念日|几号/.test(t)){
-      const dateM = t.match(/(\d{1,2})月(\d{1,2})号?/) || t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      const dateM = t.match(/(\d{1,2})月(\d{1,2})[号日]/) || t.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
       if(dateM){
-        const m = dateM[1].length===4 ? dateM[2] : dateM[1];
-        const d = dateM[1].length===4 ? dateM[3] : dateM[2];
-        const date = `${dateM[1].length===4?dateM[1]:new Date().getFullYear()}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let date;
+        if(dateM[1].length===4){
+          date = `${dateM[1]}-${String(dateM[2]).padStart(2,'0')}-${String(dateM[3]).padStart(2,'0')}`;
+        } else {
+          date = `${new Date().getFullYear()}-${String(dateM[1]).padStart(2,'0')}-${String(dateM[2]).padStart(2,'0')}`;
+        }
         const nameM = t.match(/([妈妈爸姐弟妹老婆老公儿子女儿闺蜜朋友]+(?:生日|纪念日))|((?:结婚|婚礼|圣诞|元旦|新年|春节|情人|母亲节|父亲节|教师节)(?:节)?)|(.{2,8}(?:生日|纪念日|结婚))/);
         const name = nameM ? (nameM[1]||nameM[2]||nameM[3]) : '重要日期';
         DB.countdowns.push({id:uid(), name, date, note:t});
         saveDB();
         result.matched.push({type:'倒计时', desc:`${name} · ${date}`});
-      }
-    }
-
-    // 4. 花材库存识别
-    if(/剩|库存|还有|进(?:了|货)|补(?:货)?/.test(t) && /(玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利|花材|支|把|束)/.test(t)){
-      const amtM = t.match(/(\d+)\s*(?:支|把|束)?/);
-      const flowerM = t.match(/(粉(?:色)?|红(?:色)?|白(?:色)?|黄(?:色)?|紫(?:色)?|香槟)?\s*(玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利)/);
-      if(amtM && flowerM){
-        const name = (flowerM[1]||'')+flowerM[2];
-        const qty = /剩|还有|库存/.test(t) ? +amtM[1] : +amtM[1];
-        const existing = DB.stock.find(s=>s.name.includes(flowerM[2]));
-        if(existing){ existing.qty = /进|补/.test(t) ? (+existing.qty + qty) : qty; }
-        else { DB.stock.push({id:uid(), name, unit:'支', qty, min:5, price:0, supplier:''}); }
-        saveDB();
-        result.matched.push({type:'花材', desc:`${name} ${qty}支`});
-      }
-    }
-
-    // 5. 打卡/心情识别
-    const moodMap = {'开心|高兴|快乐|心情好|不错|棒|完美|开心':'😄','平静|还行|一般|普通':'🙂','低落|不好|烦|累|疲惫|心情差':'😔','难过|伤心|糟糕|崩溃|哭':'😢'};
-    if(/心情|开心|高兴|快乐|难过|烦|累|今天|打卡/.test(t)){
-      let mood=4, moodLabel='平静';
-      if(/开心|高兴|快乐|心情好|不错|棒|完美|好/.test(t)){ mood=5; moodLabel='开心'; }
-      else if(/难过|伤心|糟糕|崩溃|哭|很差/.test(t)){ mood=1; moodLabel='糟糕'; }
-      else if(/低落|不好|烦|累|疲惫|心情差|郁闷/.test(t)){ mood=2; moodLabel='低落'; }
-      else if(/一般|还行|普通/.test(t)){ mood=3; moodLabel='一般'; }
-      if(/心情|今天|开心|高兴|难过|烦|累/.test(t) && !result.matched.length){
-        const existing = DB.checkins.find(x=>x.date===today());
-        if(existing){ existing.mood=mood; existing.note=t; }
-        else { DB.checkins.push({id:uid(),date:today(),mood,note:t}); }
-        saveDB();
-        result.matched.push({type:'打卡', desc:`心情 ${moodLabel} ${MOODS.find(m=>m.v===mood).e}`});
       }
     }
 
@@ -1110,7 +1160,7 @@ function sendAI(){
       addMsg(html);
       if(currentView==='orders'||currentView==='account'||currentView==='countdown'||currentView==='stock'||currentView==='checkin') switchView(currentView);
     } else {
-      addMsg('没太明白呢 😅 可以试试：<br>• "5号有订单 粉色玫瑰 已付款"<br>• "花了50块进花"<br>• "3月8号 妈妈生日"<br>• "心情很好"');
+      addMsg('没太明白呢 😅 可以试试：<br>• "28号 下午4:10 配送 张三 13800138000 粉色玫瑰"<br>• "花了50块进花"<br>• "3月8号 妈妈生日"');
     }
   }, 300);
 }
