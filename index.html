@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TAN</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TAN">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#F5E6E6">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><rect width='180' height='180' rx='40' fill='%23DCD3E8'/><text x='90' y='120' font-family='-apple-system,sans-serif' font-size='72' font-weight='700' fill='white' text-anchor='middle' letter-spacing='-1'>TAN</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' rx='8' fill='%23DCD3E8'/><text x='16' y='23' font-family='-apple-system,sans-serif' font-size='14' font-weight='700' fill='white' text-anchor='middle'>T</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // PWA Service Worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/tan-sw.js').catch(()=>{});
+  }
+</script>
+<style>
+  :root{
+    --bg:#F5E6E6; --card:#FFFFFF; --ink:#3A3A3C; --ink2:#6E6E73; --ink3:#A1A1A6;
+    --line:#E8D8D8; --accent:#C6D5EA; --accent2:#DCD3E8; --accent3:#C6D5EA; --accent4:#FEFBB4;
+    --rose:#DCD3E8; --sage:#C6D5EA; --sky:#C6D5EA; --butter:#FEFBB4; --clay:#DCD3E8;
+    --shadow:0 4px 20px rgba(58,58,60,.06); --shadow2:0 8px 30px rgba(58,58,60,.10);
+    --radius:16px; --radius-s:10px; --radius-l:22px;
+    --sidebar-w:240px; --sidebar-collapsed:76px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);outline:none}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--ink3);border-radius:8px;opacity:.4}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ===== Layout ===== */
+  .app{display:flex;height:100vh;width:100vw}
+  .sidebar{
+    width:var(--sidebar-w); flex-shrink:0; background:var(--card); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; transition:width .28s cubic-bezier(.4,0,.2,1); z-index:20;
+    position:relative;
+  }
+  .sidebar.collapsed{width:var(--sidebar-collapsed)}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(58,58,60,.3);z-index:19;backdrop-filter:blur(2px)}
+  @media(max-width:768px){
+    .sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);transform:translateX(0);z-index:30;box-shadow:var(--shadow2)}
+    .sidebar.collapsed{transform:translateX(calc(-1 * var(--sidebar-w)));width:var(--sidebar-w)}
+    .sidebar-overlay{display:block}
+    .sidebar.collapsed + .sidebar-overlay{display:none}
+    .topbar{padding:0 16px}
+    #btnMenuToggle{display:flex!important}
+    .content{padding:16px 12px 120px}
+    .fab{right:16px;bottom:20px}
+    .ai-panel{right:16px;bottom:88px;width:calc(100vw - 32px)}
+    .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .stat{padding:14px 16px}
+    .stat-val{font-size:22px}
+    .grid-2,.grid-3{grid-template-columns:1fr}
+  }
+  .sidebar-head{padding:20px 18px 14px; display:flex; align-items:center; gap:10px; min-height:64px}
+  .sidebar .btn-collapse-mobile{
+    display:none;position:absolute;right:-40px;top:18px;width:36px;height:36px;border-radius:0 10px 10px 0;
+    background:var(--card);border:1px solid var(--line);border-left:none;font-size:16px;color:var(--ink2);
+    align-items:center;justify-content:center;z-index:31;box-shadow:2px 2px 8px rgba(0,0,0,.06);
+  }
+  @media(max-width:768px){.sidebar .btn-collapse-mobile{display:flex}}
+  .logo-mark{
+    width:36px;height:36px;border-radius:12px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--clay),var(--rose));
+    display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;
+    box-shadow:0 4px 12px rgba(220,211,232,.35);letter-spacing:-0.5px;
+  }
+  .logo-text{display:flex;flex-direction:column;line-height:1.2;overflow:hidden;white-space:nowrap}
+  .logo-text b{font-size:16px;font-weight:600}
+  .logo-text span{font-size:11px;color:var(--ink3)}
+  .collapsed .logo-text,.collapsed .nav-label,.collapsed .nav-section-title,.collapsed .sidebar-foot-text{display:none}
+  .collapsed .sidebar-head{justify-content:center;padding:20px 0}
+
+  .nav{flex:1;overflow-y:auto;padding:8px 12px}
+  .nav-section-title{font-size:11px;color:var(--ink3);padding:14px 10px 6px;letter-spacing:.5px;font-weight:500}
+  .nav-item{
+    display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-s);
+    color:var(--ink2);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:2px;
+    transition:all .18s; position:relative;
+  }
+  .nav-item:hover{background:#F5E6E6;color:var(--ink)}
+  .nav-item.active{background:linear-gradient(135deg,rgba(220,211,232,.18),rgba(198,213,234,.14));color:var(--clay)}
+  .nav-item.active::before{content:"";position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--clay);border-radius:0 3px 3px 0}
+  .nav-ico{width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .collapsed .nav-item{justify-content:center;padding:12px 0}
+  .collapsed .nav-item.active::before{left:-12px}
+
+  .sidebar-foot{padding:12px;border-top:1px solid var(--line)}
+  .btn-collapse{
+    display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;
+    border-radius:var(--radius-s);color:var(--ink2);font-size:13px;transition:all .18s;
+  }
+  .btn-collapse:hover{background:#F5E6E6}
+  .collapse-ico{transition:transform .28s}
+  .collapsed .collapse-ico{transform:rotate(180deg)}
+
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{
+    height:60px;flex-shrink:0;background:rgba(247,244,239,.85);backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+    padding:0 28px;z-index:10;
+  }
+  .topbar-title{font-size:17px;font-weight:600}
+  .topbar-sub{font-size:12px;color:var(--ink3);margin-left:10px;font-weight:400}
+  .topbar-actions{display:flex;gap:8px;align-items:center}
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-s);
+    font-size:13px;font-weight:500;transition:all .15s;border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  }
+  .btn:hover{background:#F5E6E6;color:var(--ink)}
+  .btn-primary{background:var(--clay);color:#fff;border-color:transparent}
+  .btn-primary:hover{background:#B0A0C0;color:#fff}
+  .btn-ghost{border-color:transparent;background:transparent}
+  .btn-ghost:hover{background:#F5E6E6}
+  .btn-sm{padding:6px 10px;font-size:12px}
+  .btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:10px}
+
+  .content{flex:1;overflow-y:auto;padding:24px 28px 100px}
+  .view{display:none;animation:fade .3s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ===== Cards & Stats ===== */
+  .card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid rgba(232,216,216,.6)}
+  .card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .card-h h3{font-size:15px;font-weight:600}
+  .card-h .sub{font-size:12px;color:var(--ink3)}
+
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+  .stat{
+    background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);
+    border:1px solid rgba(232,216,216,.6);position:relative;overflow:hidden;
+  }
+  .stat::after{content:"";position:absolute;right:-20px;top:-20px;width:80px;height:80px;border-radius:50%;opacity:.12}
+  .stat.s1::after{background:var(--clay)} .stat.s2::after{background:var(--sage)} .stat.s3::after{background:var(--sky)} .stat.s4::after{background:var(--butter)}
+  .stat-label{font-size:12px;color:var(--ink3);margin-bottom:6px}
+  .stat-val{font-size:26px;font-weight:700;letter-spacing:-.5px}
+  .stat-val small{font-size:13px;font-weight:500;color:var(--ink3);margin-left:4px}
+  .stat-trend{font-size:11px;margin-top:4px;color:var(--ink2)}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+  /* ===== Forms ===== */
+  .form-row{display:grid;gap:10px;margin-bottom:12px}
+  .form-row.r2{grid-template-columns:1fr 1fr}
+  .form-row.r3{grid-template-columns:1fr 1fr 1fr}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12px;color:var(--ink2);font-weight:500}
+  .field input,.field select,.field textarea{
+    padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-s);background:#FAF3F3;
+    transition:all .15s;width:100%;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--clay);background:#fff;box-shadow:0 0 0 3px rgba(220,211,232,.12)}
+  .field textarea{resize:vertical;min-height:60px}
+
+  /* ===== Table / List ===== */
+  .list{display:flex;flex-direction:column;gap:8px}
+  .list-item{
+    background:var(--card);border-radius:var(--radius-s);padding:14px 16px;display:flex;align-items:center;gap:14px;
+    border:1px solid rgba(232,216,216,.5);transition:all .15s;
+  }
+  .list-item:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+  .list-item.done{opacity:.55}
+  .list-item.done .li-title{text-decoration:line-through;color:var(--ink3)}
+  .li-main{flex:1;min-width:0}
+  .li-title{font-weight:500;font-size:14px;margin-bottom:2px}
+  .li-sub{font-size:12px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap}
+  .li-sub span{display:inline-flex;align-items:center;gap:3px}
+  .li-actions{display:flex;gap:6px;flex-shrink:0}
+
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;line-height:1.5}
+  .tag-paid{background:rgba(198,213,234,.25);color:#7A8BA8}
+  .tag-making{background:rgba(220,211,232,.3);color:#8A7E9B}
+  .tag-delivery{background:rgba(198,213,234,.3);color:#6B7B8A}
+  .tag-done{background:rgba(220,211,232,.2);color:#A890A0}
+  .tag-income{background:rgba(198,213,234,.25);color:#7A8BA8}
+  .tag-expense{background:rgba(245,230,230,.2);color:#A890A0}
+
+  .checkbox{
+    width:22px;height:22px;border-radius:7px;border:2px solid var(--line);cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;transition:all .15s;
+  }
+  .checkbox.checked{background:var(--sage);border-color:var(--sage)}
+  .checkbox.checked::after{content:"✓";color:#fff;font-size:13px;font-weight:bold}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--ink3);font-size:13px}
+  .empty-ico{font-size:32px;margin-bottom:8px;opacity:.5}
+
+  /* ===== Progress ===== */
+  .progress{height:8px;background:#EDE0E0;border-radius:8px;overflow:hidden;margin-top:6px}
+  .progress-bar{height:100%;background:linear-gradient(90deg,var(--sage),var(--clay));border-radius:8px;transition:width .5s}
+
+  /* ===== Countdown cards ===== */
+  .cd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .cd-card{
+    background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);
+    border:1px solid rgba(232,216,216,.6);position:relative;overflow:hidden;
+  }
+  .cd-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .cd-card.c1::before{background:var(--rose)} .cd-card.c2::before{background:var(--sage)}
+  .cd-card.c3::before{background:var(--sky)} .cd-card.c4::before{background:var(--butter)}
+  .cd-card.c5::before{background:var(--clay)}
+  .cd-name{font-size:13px;color:var(--ink2);margin-bottom:4px}
+  .cd-date{font-size:11px;color:var(--ink3);margin-bottom:10px}
+  .cd-days{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1}
+  .cd-days small{font-size:13px;font-weight:500;color:var(--ink3);margin-left:4px}
+  .cd-days.urgent{color:var(--clay)}
+
+  /* ===== Floating AI Button ===== */
+  .fab{
+    position:fixed;right:28px;bottom:28px;width:56px;height:56px;border-radius:50%;
+    background:linear-gradient(135deg,var(--clay),var(--rose));box-shadow:0 8px 24px rgba(220,211,232,.4);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100;
+    transition:all .25s;
+  }
+  .fab:hover{transform:scale(1.08) rotate(-5deg);box-shadow:0 12px 32px rgba(220,211,232,.5)}
+  .fab svg{width:28px;height:28px;fill:#fff}
+  .fab-pulse{position:absolute;inset:0;border-radius:50%;border:2px solid var(--clay);animation:pulse 2s infinite;opacity:.6}
+  @keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+
+  .ai-panel{
+    position:fixed;right:28px;bottom:96px;width:380px;max-width:calc(100vw - 56px);
+    background:var(--card);border-radius:var(--radius-l);box-shadow:var(--shadow2);
+    border:1px solid var(--line);z-index:101;overflow:hidden;
+    transform:translateY(20px) scale(.95);opacity:0;pointer-events:none;transition:all .25s cubic-bezier(.4,0,.2,1);
+    transform-origin:bottom right;
+  }
+  .ai-panel.open{transform:none;opacity:1;pointer-events:auto}
+  .ai-head{padding:16px 18px;background:linear-gradient(135deg,var(--clay),var(--rose));color:#fff;display:flex;align-items:center;gap:10px}
+  .ai-head b{font-size:14px;font-weight:600}
+  .ai-head span{font-size:11px;opacity:.85}
+  .ai-close{margin-left:auto;color:#fff;font-size:18px;opacity:.8;cursor:pointer}
+  .ai-close:hover{opacity:1}
+  .ai-body{padding:14px 16px;max-height:300px;overflow-y:auto}
+  .ai-hint{font-size:12px;color:var(--ink3);margin-bottom:10px}
+  .ai-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .ai-chip{padding:6px 10px;background:#F5E6E6;border-radius:8px;font-size:12px;color:var(--ink2);cursor:pointer;transition:all .15s}
+  .ai-chip:hover{background:var(--clay);color:#fff}
+  .ai-log{display:flex;flex-direction:column;gap:8px}
+  .ai-msg{padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5}
+  .ai-msg.user{background:#F5E6E6;align-self:flex-end;max-width:85%}
+  .ai-msg.bot{background:rgba(220,211,232,.12);color:var(--ink);align-self:flex-start;max-width:90%}
+  .ai-msg.bot b{color:var(--clay)}
+  .ai-input-wrap{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px;background:#FAF3F3}
+  .ai-input{flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-s);background:#fff}
+  .ai-input:focus{border-color:var(--clay);box-shadow:0 0 0 3px rgba(220,211,232,.12)}
+  .ai-send{padding:0 14px;background:var(--clay);color:#fff;border-radius:var(--radius-s);font-weight:500}
+  .ai-send:hover{background:#B0A0C0}
+
+  /* ===== Modal ===== */
+  .modal-mask{
+    position:fixed;inset:0;background:rgba(58,58,60,.4);backdrop-filter:blur(4px);z-index:200;
+    display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .modal-mask.open{opacity:1;pointer-events:auto}
+  .modal{
+    background:var(--card);border-radius:var(--radius-l);width:90%;max-width:640px;max-height:85vh;
+    overflow:hidden;box-shadow:var(--shadow2);transform:scale(.95);transition:transform .2s;
+    display:flex;flex-direction:column;
+  }
+  .modal-mask.open .modal{transform:none}
+  .modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .modal-head h3{font-size:16px;font-weight:600}
+  .modal-body{padding:20px 22px;overflow-y:auto;flex:1}
+  .modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:#FAF3F3}
+
+  /* ===== Week Report ===== */
+  .week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px}
+  .week-card{background:#FAF3F3;border-radius:var(--radius);padding:14px 16px;border:1px solid rgba(232,216,216,.5)}
+  .week-card h4{font-size:12px;color:var(--ink3);margin-bottom:6px;font-weight:500}
+  .week-card .v{font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .insight{background:linear-gradient(135deg,rgba(220,211,232,.1),rgba(198,213,234,.1));border-radius:var(--radius);padding:16px;border:1px solid rgba(220,211,232,.2)}
+  .insight h4{font-size:13px;color:var(--clay);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .insight p{font-size:13px;color:var(--ink);line-height:1.7}
+  .insight ul{margin:6px 0 0 18px;font-size:13px;color:var(--ink2);line-height:1.8}
+
+  /* misc */
+  .seg{display:inline-flex;background:#F5E6E6;border-radius:10px;padding:3px;gap:2px}
+  .seg button{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;color:var(--ink2);transition:all .15s}
+  .seg button.on{background:#fff;color:var(--clay);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .divider{height:1px;background:var(--line);margin:16px 0}
+  .muted{color:var(--ink3)} .small{font-size:12px}
+  .row{display:flex;align-items:center;gap:8px}
+  .row-between{display:flex;align-items:center;justify-content:space-between}
+  .mt8{margin-top:8px} .mt16{margin-top:16px} .mb16{margin-bottom:16px}
+  .toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;z-index:300;opacity:0;transition:all .25s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* mood */
+  .mood-row{display:flex;gap:8px;flex-wrap:wrap}
+  .mood-btn{width:42px;height:42px;border-radius:12px;background:#FAF3F3;border:1px solid var(--line);font-size:20px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+  .mood-btn:hover{transform:scale(1.1)}
+  .mood-btn.sel{background:var(--butter);border-color:var(--clay);transform:scale(1.05)}
+
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+  .gal-item{background:var(--card);border-radius:var(--radius);padding:14px;border:1px solid rgba(232,216,216,.5);cursor:pointer;transition:all .15s}
+  .gal-item:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .gal-emo{font-size:28px;margin-bottom:6px}
+  .gal-title{font-size:13px;font-weight:500;margin-bottom:2px}
+  .gal-desc{font-size:11px;color:var(--ink3);line-height:1.4}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <button class="btn-collapse-mobile" id="btnMobileToggle">☰</button>
+    <div class="sidebar-head">
+      <div class="logo-mark">TAN</div>
+      <div class="logo-text"><b>TAN</b></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section-title">业务模块</div>
+      <div class="nav-item active" data-view="orders"><span class="nav-ico">📋</span><span class="nav-label">工作室订单</span></div>
+      <div class="nav-item" data-view="account"><span class="nav-ico">📒</span><span class="nav-label">工作室记账本</span></div>
+      <div class="nav-item" data-view="countdown"><span class="nav-ico">⏰</span><span class="nav-label">重要日期倒计时</span></div>
+      <div class="nav-section-title">数据</div>
+      <div class="nav-item" data-view="week"><span class="nav-ico">📊</span><span class="nav-label">周度数据分析</span></div>
+      <div class="nav-item" data-view="backup"><span class="nav-ico">☁️</span><span class="nav-label">备份与恢复</span></div>
+    </nav>
+    <div class="sidebar-foot">
+      <button class="btn-collapse" id="btnCollapse">
+        <span class="collapse-ico">‹</span>
+        <span class="sidebar-foot-text">收起侧边栏</span>
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-icon btn-ghost" id="btnMenuToggle" style="display:none">☰</button>
+        <div>
+          <span class="topbar-title" id="viewTitle">工作室订单</span>
+          <span class="topbar-sub" id="viewDate"></span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-sm" id="btnExport">⬇ 导出备份</button>
+        <button class="btn btn-sm" id="btnImport">⬆ 导入</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+      </div>
+    </header>
+    <section class="content" id="content">
+      <!-- views injected by JS -->
+    </section>
+  </main>
+</div>
+
+<!-- AI FAB -->
+<div class="fab" id="fab">
+  <div class="fab-pulse"></div>
+  <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.04 2 11c0 2.52 1.17 4.8 3.06 6.44L4 22l4.7-2.2c1.04.28 2.15.43 3.3.43 5.52 0 10-4.04 10-9.23S17.52 2 12 2zm-4 8.5c0-.83.67-1.5 1.5-1.5S11 9.67 11 10.5 10.33 12 9.5 12 8 11.33 8 10.5zm8 0c0-.83.67-1.5 1.5-1.5S19 9.67 19 10.5 18.33 12 17.5 12 16 11.33 16 10.5z"/></svg>
+</div>
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-head">
+    <div style="font-size:20px">🤖</div>
+    <div><b>TAN 助手</b><br><span>说点什么，我帮你记</span></div>
+    <div class="ai-close" id="aiClose">✕</div>
+  </div>
+  <div class="ai-body">
+    <div class="ai-hint">试试这样说：</div>
+    <div class="ai-chips">
+      <span class="ai-chip">5号有订单 粉色玫瑰 已付款</span>
+      <span class="ai-chip">花了50块进花</span>
+      <span class="ai-chip">收入300 婚礼花艺</span>
+      <span class="ai-chip">3月8号 妈妈生日</span>
+      <span class="ai-chip">心情很好</span>
+      <span class="ai-chip">康乃馨还剩20支</span>
+    </div>
+    <div class="ai-log" id="aiLog"></div>
+  </div>
+  <div class="ai-input-wrap">
+    <input class="ai-input" id="aiInput" placeholder="用中文描述，自动识别写入…">
+    <button class="ai-send" id="aiSend">发送</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">标题</h3><button class="btn-ghost" id="modalClose">✕</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   TAN - 单文件应用
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const today = () => new Date().toISOString().slice(0,10);
+const now = () => new Date().toISOString().slice(0,16);
+const fmt = d => d ? new Date(d).toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'}) : '';
+const fmtMoney = n => '¥' + Math.round(n).toLocaleString();
+const escape = s => String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ===== Storage ===== */
+const STORE_KEY = 'tan_workbench_v1';
+let DB = loadDB();
+function loadDB(){
+  try{ const d = JSON.parse(localStorage.getItem(STORE_KEY)); if(d) return d; }catch(e){}
+  return { orders:[], account:[], countdowns:[], stock:[], customers:[], inspires:[], checkins:[], meta:{created:now()} };
+}
+function saveDB(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+
+/* ===== View Router ===== */
+const VIEWS = {
+  orders:   {title:'工作室订单', render:renderOrders, date:''},
+  account:  {title:'工作室记账本', render:renderAccount},
+  countdown:{title:'重要日期倒计时', render:renderCountdown},
+  week:     {title:'周度数据分析', render:renderWeek},
+  backup:   {title:'备份与恢复', render:renderBackup},
+};
+let currentView = 'orders';
+
+function switchView(v){
+  currentView = v;
+  $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view===v));
+  $('#viewTitle').textContent = VIEWS[v].title;
+  const d = new Date();
+  $('#viewDate').textContent = `${d.getMonth()+1}月${d.getDate()}日 ${['日','一','二','三','四','五','六'][d.getDay()]}`;
+  $('#content').innerHTML = '';
+  VIEWS[v].render();
+}
+$$('.nav-item').forEach(n => n.addEventListener('click', () => switchView(n.dataset.view)));
+
+/* ===== Toast ===== */
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2000); }
+
+/* ===== Modal ===== */
+function openModal(title, bodyHTML, footHTML){
+  $('#modalTitle').textContent = title;
+  $('#modalBody').innerHTML = bodyHTML;
+  $('#modalFoot').innerHTML = footHTML || '<button class="btn" onclick="closeModal()">关闭</button>';
+  $('#modalMask').classList.add('open');
+}
+function closeModal(){ $('#modalMask').classList.remove('open'); }
+$('#modalClose').addEventListener('click', closeModal);
+$('#modalMask').addEventListener('click', e => { if(e.target===$('#modalMask')) closeModal(); });
+
+/* ===== Helpers ===== */
+function confirmDel(name, cb){
+  openModal('确认删除', `<p style="padding:10px 0">确定删除「${escape(name)}」吗？此操作不可撤销。</p>`,
+    `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="delConfirm">删除</button>`);
+  $('#delConfirm').addEventListener('click', ()=>{ closeModal(); cb(); });
+}
+
+/* ============================================================
+   1. 订单模块
+   ============================================================ */
+const ORDER_STATUS = [
+  {key:'paid', label:'已付款', cls:'tag-paid'},
+  {key:'making', label:'制作中', cls:'tag-making'},
+  {key:'delivery', label:'待配送', cls:'tag-delivery'},
+  {key:'done', label:'已完成', cls:'tag-done'},
+];
+function renderOrders(){
+  const c = $('#content');
+  const todays = DB.orders.filter(o => o.createdAt && o.createdAt.slice(0,10)===today());
+  const todayDone = DB.orders.filter(o => o.status==='done' && o.doneDate && o.doneDate.slice(0,10)===today()).length;
+  const todayTotal = DB.orders.filter(o => o.createdAt && o.createdAt.slice(0,10)===today()).length;
+  // 今日完成率：以今日新增或今日完成的订单为分母
+  const denom = DB.orders.filter(o => (o.createdAt&&o.createdAt.slice(0,10)===today()) || (o.doneDate&&o.doneDate.slice(0,10)===today())).length;
+  const rate = denom ? Math.round(todayDone/denom*100) : 0;
+  const active = DB.orders.filter(o => o.status!=='done').sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  const done = DB.orders.filter(o => o.status==='done').sort((a,b)=>(b.doneDate||'').localeCompare(a.doneDate||''));
+
+  c.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat s1"><div class="stat-label">今日完成率</div><div class="stat-val">${rate}<small>%</small></div><div class="progress"><div class="progress-bar" style="width:${rate}%"></div></div></div>
+      <div class="stat s2"><div class="stat-label">进行中订单</div><div class="stat-val">${active.length}<small>单</small></div></div>
+      <div class="stat s3"><div class="stat-label">今日新增</div><div class="stat-val">${todayTotal}<small>单</small></div></div>
+      <div class="stat s4"><div class="stat-label">累计完成</div><div class="stat-val">${done.length}<small>单</small></div></div>
+    </div>
+    <div class="row-between mb16">
+      <div class="row"><button class="btn btn-primary" id="addOrder">+ 新建订单</button></div>
+      <div class="seg" id="orderFilter">
+        <button class="on" data-f="all">全部</button>
+        <button data-f="active">进行中</button>
+        <button data-f="done">已完成</button>
+      </div>
+    </div>
+    <div class="list" id="orderList"></div>
+  `;
+  $('#addOrder').addEventListener('click', ()=>orderForm());
+  $('#orderFilter').addEventListener('click', e=>{
+    if(e.target.tagName!=='BUTTON') return;
+    $$('#orderFilter button').forEach(b=>b.classList.remove('on'));
+    e.target.classList.add('on');
+    drawOrders(e.target.dataset.f);
+  });
+  drawOrders('all');
+}
+function drawOrders(filter){
+  let list = DB.orders.slice();
+  if(filter==='active') list = list.filter(o=>o.status!=='done');
+  if(filter==='done') list = list.filter(o=>o.status==='done');
+  list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const box = $('#orderList');
+  if(!list.length){ box.innerHTML = '<div class="empty"><div class="empty-ico">📋</div>暂无订单，点击右上角新建</div>'; return; }
+  box.innerHTML = list.map(o=>{
+    const st = ORDER_STATUS.find(s=>s.key===o.status) || ORDER_STATUS[0];
+    const checked = o.status==='done' ? 'checked' : '';
+    return `<div class="list-item ${checked?'done':''}">
+      <div class="checkbox ${checked}" data-toggle="${o.id}"></div>
+      <div class="li-main">
+        <div class="li-title">${escape(o.style||'未命名款式')} · ${escape(o.recipient||'')}</div>
+        <div class="li-sub">
+          <span class="tag ${st.cls}">${st.label}</span>
+          <span>📅 ${fmt(o.orderDate||o.createdAt)}</span>
+          <span>⏰ ${escape(o.useTime||'-')}</span>
+          <span>${o.deliveryType==='pickup'?'🏪 自提':'🚗 配送'}</span>
+          ${o.contact?`<span>📱 ${escape(o.contact)}</span>`:''}
+          ${o.deliveryType==='delivery'&&o.address?`<span>📍 ${escape(o.address)}</span>`:''}
+        </div>
+        ${o.card?`<div class="li-sub" style="margin-top:4px;color:var(--ink2)">💌 ${escape(o.card)}</div>`:''}
+        ${o.note?`<div class="li-sub" style="margin-top:4px">📝 ${escape(o.note)}</div>`:''}
+      </div>
+      <div class="li-actions">
+        <button class="btn btn-icon btn-ghost" data-edit="${o.id}" title="编辑">✎</button>
+        <button class="btn btn-icon btn-ghost" data-del="${o.id}" title="删除">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  // bind
+  box.querySelectorAll('[data-toggle]').forEach(el=>el.addEventListener('click',()=>{
+    const o = DB.orders.find(x=>x.id===el.dataset.toggle);
+    if(o.status==='done'){ o.status='paid'; o.doneDate=null; }
+    else { o.status='done'; o.doneDate=now(); }
+    saveDB(); renderOrders();
+  }));
+  box.querySelectorAll('[data-edit]').forEach(el=>el.addEventListener('click',()=>orderForm(el.dataset.edit)));
+  box.querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',()=>{
+    const o = DB.orders.find(x=>x.id===el.dataset.del);
+    confirmDel(o.style||o.recipient||'订单', ()=>{ DB.orders = DB.orders.filter(x=>x.id!==el.dataset.del); saveDB(); renderOrders(); toast('已删除'); });
+  }));
+}
+function orderForm(id){
+  const o = id ? DB.orders.find(x=>x.id===id) : {};
+  const body = `
+    <div class="form-row r2">
+      <div class="field"><label>订单时间</label><input type="date" id="f_orderDate" value="${o.orderDate||today()}"></div>
+      <div class="field"><label>用花时间</label><input type="text" id="f_useTime" placeholder="如 3月8日 14:00" value="${escape(o.useTime||'')}"></div>
+    </div>
+    <div class="form-row r2">
+      <div class="field"><label>订单款式</label><input type="text" id="f_style" placeholder="如 粉色玫瑰花束" value="${escape(o.style||'')}"></div>
+      <div class="field"><label>订单状态</label><select id="f_status">${ORDER_STATUS.map(s=>`<option value="${s.key}" ${o.status===s.key?'selected':''}>${s.label}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-row r2">
+      <div class="field"><label>配送方式</label><select id="f_delivery"><option value="pickup" ${o.deliveryType==='pickup'?'selected':''}>自提</option><option value="delivery" ${o.deliveryType==='delivery'?'selected':''}>配送</option></select></div>
+      <div class="field"><label>收花人</label><input type="text" id="f_recipient" value="${escape(o.recipient||'')}"></div>
+    </div>
+    <div class="form-row r2">
+      <div class="field"><label>收花人联系方式</label><input type="text" id="f_contact" placeholder="手机号" value="${escape(o.contact||'')}"></div>
+      <div class="field"><label>配送地址（配送时填）</label><input type="text" id="f_address" value="${escape(o.address||'')}"></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>卡片内容</label><textarea id="f_card" placeholder="写在花束卡片上的话">${escape(o.card||'')}</textarea></div>
+    <div class="field" style="margin-top:10px"><label>备注</label><textarea id="f_note" placeholder="其他备注信息">${escape(o.note||'')}</textarea></div>
+  `;
+  openModal(id?'编辑订单':'新建订单', body,
+    `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="saveOrder">保存</button>`);
+  $('#saveOrder').addEventListener('click', ()=>{
+    const data = {
+      orderDate: $('#f_orderDate').value,
+      useTime: $('#f_useTime').value.trim(),
+      style: $('#f_style').value.trim(),
+      status: $('#f_status').value,
+      deliveryType: $('#f_delivery').value,
+      recipient: $('#f_recipient').value.trim(),
+      contact: $('#f_contact').value.trim(),
+      address: $('#f_address').value.trim(),
+      card: $('#f_card').value.trim(),
+      note: $('#f_note').value.trim(),
+    };
+    if(id){ Object.assign(o, data); }
+    else { DB.orders.push({id:uid(), createdAt:now(), doneDate: data.status==='done'?now():null, ...data}); }
+    saveDB(); closeModal(); renderOrders(); toast(id?'已更新':'已添加');
+  });
+}
+
+/* ============================================================
+   2. 记账模块
+   ============================================================ */
+const EXPENSE_CATS = ['资材','进花','跑腿','水电费','房租','物业费','车位费','餐饮','交通','购物','娱乐','住房','医疗','教育','工资','理财','其他'];
+const INCOME_CATS = ['工作室收入','理财收益','其他'];
+let pieChart = null;
+let accFilter = 'month';
+function renderAccount(){
+  const c = $('#content');
+  const now0 = new Date();
+  const ym = `${now0.getFullYear()}-${String(now0.getMonth()+1).padStart(2,'0')}`;
+  const yy = `${now0.getFullYear()}`;
+  const monthRecs = DB.account.filter(a=>a.date&&a.date.startsWith(ym));
+  const yearRecs = DB.account.filter(a=>a.date&&a.date.startsWith(yy));
+  const sumIncome = arr => arr.filter(a=>a.type==='income').reduce((s,a)=>s+(+a.amount||0),0);
+  const sumExpense = arr => arr.filter(a=>a.type==='expense').reduce((s,a)=>s+(+a.amount||0),0);
+  const mIn=sumIncome(monthRecs), mOut=sumExpense(monthRecs), mBal=mIn-mOut;
+  const yIn=sumIncome(yearRecs), yOut=sumExpense(yearRecs), yBal=yIn-yOut;
+
+  c.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat s1"><div class="stat-label">本月收入</div><div class="stat-val">${fmtMoney(mIn)}</div></div>
+      <div class="stat s3"><div class="stat-label">本月支出</div><div class="stat-val">${fmtMoney(mOut)}</div></div>
+      <div class="stat s2"><div class="stat-label">本月结余</div><div class="stat-val" style="color:${mBal>=0?'#7A8BA8':'#A890A0'}">${fmtMoney(mBal)}</div></div>
+      <div class="stat s4"><div class="stat-label">年度结余</div><div class="stat-val" style="color:${yBal>=0?'#7A8BA8':'#A890A0'}">${fmtMoney(yBal)}</div></div>
+    </div>
+    <div class="grid-2 mb16">
+      <div class="card">
+        <div class="card-h"><h3>支出分类占比（本月）</h3></div>
+        <canvas id="pieChart" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <h3>收支明细</h3>
+          <button class="btn btn-sm btn-primary" id="addAcc">+ 记一笔</button>
+        </div>
+        <div class="seg mb16" id="accFilter">
+          <button class="on" data-f="month">本月</button>
+          <button data-f="year">本年</button>
+          <button data-f="all">全部</button>
+        </div>
+        <div class="list" id="accList" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card"><div class="card-h"><h3>年度收入</h3></div><div class="stat-val">${fmtMoney(yIn)}</div></div>
+      <div class="card"><div class="card-h"><h3>年度支出</h3></div><div class="stat-val">${fmtMoney(yOut)}</div></div>
+      <div class="card"><div class="card-h"><h3>记录总数</h3></div><div class="stat-val">${DB.account.length}<small>条</small></div></div>
+    </div>
+  `;
+  $('#addAcc').addEventListener('click', ()=>accForm());
+  $('#accFilter').addEventListener('click', e=>{
+    if(e.target.tagName!=='BUTTON') return;
+    $$('#accFilter button').forEach(b=>b.classList.remove('on'));
+    e.target.classList.add('on'); accFilter=e.target.dataset.f; drawAcc();
+  });
+  drawPie(monthRecs); drawAcc();
+}
+function drawPie(recs){
+  const ctx = $('#pieChart'); if(!ctx) return;
+  const exp = recs.filter(a=>a.type==='expense');
+  const byCat = {};
+  exp.forEach(a=>{ byCat[a.cat]=(byCat[a.cat]||0)+(+a.amount||0); });
+  const labels = Object.keys(byCat); const data = Object.values(byCat);
+  const colors = ['#DCD3E8','#C6D5EA','#F5E6E6','#FEFBB4','#D0C4E0','#B8CDE0','#E8DCDC','#F8F4C0','#CDC0DC','#C0D0E4','#EDD8D8','#FCF7B8','#D4C8E4','#BED2E8','#E4D4D4','#FEF8B0'];
+  if(pieChart) pieChart.destroy();
+  if(!labels.length){
+    ctx.parentElement.innerHTML = '<div class="empty"><div class="empty-ico">🥧</div>本月暂无支出记录</div>';
+    return;
+  }
+  pieChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:colors.slice(0,labels.length), borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ font:{size:11}, padding:8, boxWidth:12 } }, tooltip:{ callbacks:{ label:c=>` ${c.label}: ¥${Math.round(c.raw)}` } } }, cutout:'60%' }
+  });
+}
+function drawAcc(){
+  const now0=new Date(); const ym=`${now0.getFullYear()}-${String(now0.getMonth()+1).padStart(2,'0')}`; const yy=`${now0.getFullYear()}`;
+  let list = DB.account.slice();
+  if(accFilter==='month') list=list.filter(a=>a.date&&a.date.startsWith(ym));
+  if(accFilter==='year') list=list.filter(a=>a.date&&a.date.startsWith(yy));
+  list.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const box=$('#accList');
+  if(!list.length){ box.innerHTML='<div class="empty" style="padding:20px"><div class="empty-ico">📒</div>暂无记录</div>'; return; }
+  box.innerHTML = list.map(a=>`
+    <div class="list-item">
+      <div class="li-main">
+        <div class="li-title">${a.type==='income'?'💰':'💸'} ${escape(a.cat)} <small style="color:var(--ink3)">· ${escape(a.note||'')}</small></div>
+        <div class="li-sub"><span>📅 ${fmt(a.date)}</span></div>
+      </div>
+      <div style="font-weight:600;color:${a.type==='income'?'#7A8BA8':'#A890A0'}">${a.type==='income'?'+':'-'}${fmtMoney(a.amount)}</div>
+      <div class="li-actions">
+        <button class="btn btn-icon btn-ghost" data-del="${a.id}">🗑</button>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',()=>{
+    const a=DB.account.find(x=>x.id===el.dataset.del);
+    confirmDel(a.cat+' '+fmtMoney(a.amount), ()=>{ DB.account=DB.account.filter(x=>x.id!==el.dataset.del); saveDB(); renderAccount(); toast('已删除'); });
+  }));
+}
+function accForm(id){
+  const a = id ? DB.account.find(x=>x.id===id) : {type:'expense', date:today()};
+  const cats = a.type==='income' ? INCOME_CATS : EXPENSE_CATS;
+  const body = `
+    <div class="seg mb16" id="accType">
+      <button class="${a.type==='expense'?'on':''}" data-t="expense">💸 支出</button>
+      <button class="${a.type==='income'?'on':''}" data-t="income">💰 收入</button>
+    </div>
+    <div class="form-row r2">
+      <div class="field"><label>金额</label><input type="number" id="f_amount" placeholder="0.00" value="${a.amount||''}" autofocus></div>
+      <div class="field"><label>日期</label><input type="date" id="f_date" value="${a.date||today()}"></div>
+    </div>
+    <div class="field"><label>分类</label><select id="f_cat">${cats.map(c=>`<option value="${c}" ${a.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="field" style="margin-top:10px"><label>备注</label><input type="text" id="f_note" placeholder="可选" value="${escape(a.note||'')}"></div>
+  `;
+  openModal(id?'编辑记录':'记一笔', body, `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="saveAcc">保存</button>`);
+  let curType = a.type;
+  $('#accType').addEventListener('click', e=>{
+    if(e.target.tagName!=='BUTTON') return;
+    $$('#accType button').forEach(b=>b.classList.remove('on')); e.target.classList.add('on');
+    curType = e.target.dataset.t;
+    const cs = curType==='income'?INCOME_CATS:EXPENSE_CATS;
+    $('#f_cat').innerHTML = cs.map(c=>`<option value="${c}">${c}</option>`).join('');
+  });
+  $('#saveAcc').addEventListener('click', ()=>{
+    const data = { type:curType, amount:+$('#f_amount').value||0, date:$('#f_date').value, cat:$('#f_cat').value, note:$('#f_note').value.trim() };
+    if(!data.amount){ toast('请输入金额'); return; }
+    if(id){ Object.assign(a, data); } else { DB.account.push({id:uid(), ...data}); }
+    saveDB(); closeModal(); renderAccount(); toast('已保存');
+  });
+}
+
+/* ============================================================
+   3. 倒计时模块
+   ============================================================ */
+function renderCountdown(){
+  const c=$('#content');
+  const list = DB.countdowns.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const colors=['c1','c2','c3','c4','c5'];
+  c.innerHTML = `
+    <div class="row-between mb16">
+      <h3 style="font-size:16px;font-weight:600">重要日期</h3>
+      <button class="btn btn-primary" id="addCd">+ 添加日期</button>
+    </div>
+    <div class="cd-grid" id="cdGrid"></div>
+  `;
+  $('#addCd').addEventListener('click', ()=>cdForm());
+  const grid=$('#cdGrid');
+  if(!list.length){ grid.innerHTML='<div class="empty"><div class="empty-ico">⏰</div>暂无重要日期</div>'; return; }
+  grid.innerHTML = list.map((d,i)=>{
+    const target = new Date(d.date); const nowd=new Date(); nowd.setHours(0,0,0,0);
+    const days = Math.ceil((target-nowd)/86400000);
+    const isPast = days<0;
+    return `<div class="cd-card ${colors[i%5]}">
+      <div class="cd-name">${escape(d.name)}</div>
+      <div class="cd-date">${d.date} · ${isPast?'已过':'还有'}</div>
+      <div class="cd-days ${Math.abs(days)<=7&&!isPast?'urgent':''}">${Math.abs(days)}<small>天${isPast?'前':''}</small></div>
+      ${d.note?`<div class="small muted" style="margin-top:8px">${escape(d.note)}</div>`:''}
+      <div class="li-actions" style="margin-top:8px">
+        <button class="btn btn-icon btn-ghost" data-edit="${d.id}">✎</button>
+        <button class="btn btn-icon btn-ghost" data-del="${d.id}">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('[data-edit]').forEach(el=>el.addEventListener('click',()=>cdForm(el.dataset.edit)));
+  grid.querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',()=>{
+    const d=DB.countdowns.find(x=>x.id===el.dataset.del);
+    confirmDel(d.name, ()=>{ DB.countdowns=DB.countdowns.filter(x=>x.id!==el.dataset.del); saveDB(); renderCountdown(); toast('已删除'); });
+  }));
+}
+function cdForm(id){
+  const d = id ? DB.countdowns.find(x=>x.id===id) : {date:today()};
+  openModal(id?'编辑日期':'添加日期', `
+    <div class="field"><label>日期名称</label><input type="text" id="f_name" placeholder="如 妈妈生日" value="${escape(d.name||'')}"></div>
+    <div class="field" style="margin-top:10px"><label>日期</label><input type="date" id="f_date" value="${d.date}"></div>
+    <div class="field" style="margin-top:10px"><label>备注</label><input type="text" id="f_note" value="${escape(d.note||'')}"></div>
+  `, `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="saveCd">保存</button>`);
+  $('#saveCd').addEventListener('click', ()=>{
+    const data={ name:$('#f_name').value.trim(), date:$('#f_date').value, note:$('#f_note').value.trim() };
+    if(!data.name||!data.date){ toast('请填写名称和日期'); return; }
+    if(id){ Object.assign(d,data); } else { DB.countdowns.push({id:uid(), ...data}); }
+    saveDB(); closeModal(); renderCountdown(); toast('已保存');
+  });
+}
+
+/* ============================================================
+   共享工具函数
+   ============================================================ */
+const MOODS=[{e:'😄',l:'开心',v:5},{e:'🙂',l:'平静',v:4},{e:'😐',l:'一般',v:3},{e:'😔',l:'低落',v:2},{e:'😢',l:'糟糕',v:1}];
+function getWeekCheckins(){
+  const nowd=new Date(); const day=nowd.getDay()||7;
+  const monday=new Date(nowd); monday.setDate(nowd.getDate()-day+1); monday.setHours(0,0,0,0);
+  const arr=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(monday); d.setDate(monday.getDate()+i);
+    const ds=d.toISOString().slice(0,10);
+    arr.push(DB.checkins.find(x=>x.date===ds)||null);
+  }
+  return arr;
+}
+
+/* ============================================================
+   周度数据分析
+   ============================================================ */
+function renderWeek(){
+  const c=$('#content');
+  const nowd=new Date(); const day=nowd.getDay()||7;
+  const monday=new Date(nowd); monday.setDate(nowd.getDate()-day+1); monday.setHours(0,0,0,0);
+  const sunday=new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59,999);
+  const inWeek = d => { const t=new Date(d); return t>=monday && t<=sunday; };
+  const weekOrders = DB.orders.filter(o=>o.createdAt&&inWeek(o.createdAt));
+  const weekDone = DB.orders.filter(o=>o.doneDate&&inWeek(o.doneDate));
+  const weekAcc = DB.account.filter(a=>a.date&&inWeek(a.date));
+  const wIn=weekAcc.filter(a=>a.type==='income').reduce((s,a)=>s+(+a.amount||0),0);
+  const wOut=weekAcc.filter(a=>a.type==='expense').reduce((s,a)=>s+(+a.amount||0),0);
+  const weekCheckins=getWeekCheckins().filter(Boolean);
+  const lowStock=DB.stock.filter(s=>+s.qty<=(+s.min||0));
+  const upcoming=DB.countdowns.filter(d=>{ const t=new Date(d.date); const diff=(t-nowd)/86400000; return diff>=0&&diff<=30; });
+
+  // AI 洞察
+  const insights=[];
+  if(weekDone.length>=5) insights.push(`本周完成 ${weekDone.length} 单，节奏稳定，保持住！`);
+  if(wOut>wIn && wOut>0) insights.push(`本周支出 ¥${Math.round(wOut)} 超过收入 ¥${Math.round(wIn)}，注意控制成本。`);
+  if(lowStock.length) insights.push(`${lowStock.length} 种花材库存不足：${lowStock.map(s=>s.name).join('、')}，建议尽快补货。`);
+  if(upcoming.length) insights.push(`30天内有 ${upcoming.length} 个重要日期临近：${upcoming.map(d=>d.name+'('+fmt(d.date)+')').join('、')}。`);
+  if(weekCheckins.length>=3){
+    const avg=(weekCheckins.reduce((s,x)=>s+(+x.mood||3),0)/weekCheckins.length).toFixed(1);
+    insights.push(`本周打卡 ${weekCheckins.length} 天，平均心情 ${avg} 分，状态不错。`);
+  }
+  if(!insights.length) insights.push('本周数据较少，继续记录可获得更精准的洞察。');
+
+  c.innerHTML=`
+    <div class="card mb16">
+      <div class="card-h"><h3>📊 本周数据汇总</h3><span class="sub">${monday.toLocaleDateString('zh-CN')} - ${sunday.toLocaleDateString('zh-CN')}</span></div>
+      <div class="week-grid">
+        <div class="week-card"><h4>新增订单</h4><div class="v">${weekOrders.length}<small style="font-size:13px;color:var(--ink3);margin-left:4px">单</small></div></div>
+        <div class="week-card"><h4>完成订单</h4><div class="v">${weekDone.length}<small style="font-size:13px;color:var(--ink3);margin-left:4px">单</small></div></div>
+        <div class="week-card"><h4>本周收入</h4><div class="v" style="color:#7A8BA8">${fmtMoney(wIn)}</div></div>
+        <div class="week-card"><h4>本周支出</h4><div class="v" style="color:#A890A0">${fmtMoney(wOut)}</div></div>
+        <div class="week-card"><h4>本周结余</h4><div class="v" style="color:${wIn-wOut>=0?'#7A8BA8':'#A890A0'}">${fmtMoney(wIn-wOut)}</div></div>
+        <div class="week-card"><h4>打卡天数</h4><div class="v">${weekCheckins.length}<small style="font-size:13px;color:var(--ink3);margin-left:4px">/7</small></div></div>
+        <div class="week-card"><h4>库存预警</h4><div class="v">${lowStock.length}<small style="font-size:13px;color:var(--ink3);margin-left:4px">项</small></div></div>
+        <div class="week-card"><h4>临近日期</h4><div class="v">${upcoming.length}<small style="font-size:13px;color:var(--ink3);margin-left:4px">个</small></div></div>
+      </div>
+    </div>
+    <div class="insight">
+      <h4>🤖 AI 洞察建议</h4>
+      <ul>${insights.map(i=>`<li>${i}</li>`).join('')}</ul>
+    </div>
+  `;
+}
+
+/* ============================================================
+   备份与恢复
+   ============================================================ */
+function renderBackup(){
+  const c=$('#content');
+  const size = new Blob([JSON.stringify(DB)]).size;
+  c.innerHTML=`
+    <div class="card mb16">
+      <div class="card-h"><h3>☁️ 数据备份</h3></div>
+      <div class="small muted" style="margin-bottom:16px">所有数据保存在浏览器本地(localStorage)，建议定期导出 JSON 文件备份。</div>
+      <div class="stats-grid">
+        <div class="stat s1"><div class="stat-label">订单</div><div class="stat-val">${DB.orders.length}</div></div>
+        <div class="stat s2"><div class="stat-label">记账</div><div class="stat-val">${DB.account.length}</div></div>
+        <div class="stat s3"><div class="stat-label">倒计时</div><div class="stat-val">${DB.countdowns.length}</div></div>
+        <div class="stat s4"><div class="stat-label">客户</div><div class="stat-val">${DB.customers.length}</div></div>
+      </div>
+      <div class="grid-3" style="margin-top:8px">
+        <div class="stat s1"><div class="stat-label">花材</div><div class="stat-val">${DB.stock.length}</div></div>
+        <div class="stat s2"><div class="stat-label">灵感</div><div class="stat-val">${DB.inspires.length}</div></div>
+        <div class="stat s3"><div class="stat-label">打卡</div><div class="stat-val">${DB.checkins.length}</div></div>
+      </div>
+    </div>
+    <div class="card mb16">
+      <div class="card-h"><h3>操作</h3></div>
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="bExport">⬇ 导出 JSON 备份</button>
+        <button class="btn" id="bImport2">⬆ 导入备份</button>
+        <button class="btn" id="bClear" style="color:#A890A0">🗑 清空所有数据</button>
+      </div>
+      <div class="small muted" style="margin-top:12px">备份文件大小：约 ${(size/1024).toFixed(1)} KB</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>关于</h3></div>
+      <p class="small muted">TAN v1.0 · 纯前端单文件应用<br>数据完全本地存储，不会上传到任何服务器。</p>
+    </div>
+  `;
+  $('#bExport').addEventListener('click',exportJSON);
+  $('#bImport2').addEventListener('click',()=>$('#fileImport').click());
+  $('#bClear').addEventListener('click',()=>{
+    openModal('清空数据', `<p style="padding:10px 0;color:#A890A0">⚠ 此操作将删除所有数据，且无法恢复。建议先导出备份。</p>`,
+      `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="clearOk" style="background:#A890A0">确认清空</button>`);
+    $('#clearOk').addEventListener('click',()=>{
+      DB={orders:[],account:[],countdowns:[],stock:[],customers:[],inspires:[],checkins:[],meta:{created:now()}};
+      saveDB(); closeModal(); switchView('orders'); toast('已清空');
+    });
+  });
+}
+
+/* ===== 导入导出 ===== */
+function exportJSON(){
+  const data = JSON.stringify({...DB, exportedAt:now()}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tan_backup_${today()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('已导出备份');
+}
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      openModal('确认导入', `<p style="padding:10px 0">检测到备份文件，包含：<br>• 订单 ${data.orders?.length||0} 条<br>• 记账 ${data.account?.length||0} 条<br>• 倒计时 ${data.countdowns?.length||0} 条<br>• 花材 ${data.stock?.length||0} 条<br>• 客户 ${data.customers?.length||0} 条<br><br>导入将<b>覆盖</b>当前数据，是否继续？</p>`,
+        `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="importOk">导入</button>`);
+      $('#importOk').addEventListener('click',()=>{
+        DB = {
+          orders:data.orders||[], account:data.account||[], countdowns:data.countdowns||[],
+          stock:data.stock||[], customers:data.customers||[], inspires:data.inspires||[],
+          checkins:data.checkins||[], meta:data.meta||{created:now()}
+        };
+        saveDB(); closeModal(); switchView(currentView); toast('导入成功');
+      });
+    }catch(err){ toast('文件格式错误'); }
+  };
+  reader.readAsText(file);
+}
+$('#btnExport').addEventListener('click', exportJSON);
+$('#btnImport').addEventListener('click', ()=>$('#fileImport').click());
+$('#fileImport').addEventListener('change', e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; });
+
+/* ===== 侧边栏折叠 ===== */
+function toggleSidebar(){
+  const sb = $('#sidebar');
+  sb.classList.toggle('collapsed');
+  localStorage.setItem('tan_sidebar', sb.classList.contains('collapsed') ? '1' : '0');
+}
+$('#btnCollapse').addEventListener('click', toggleSidebar);
+$('#btnMobileToggle').addEventListener('click', toggleSidebar);
+$('#btnMenuToggle').addEventListener('click', toggleSidebar);
+$('#sidebarOverlay').addEventListener('click', toggleSidebar);
+
+// 手机端：点击侧边栏内导航后自动折叠
+$$('.nav-item').forEach(n => {
+  n.addEventListener('click', (e) => {
+    if(window.innerWidth < 768){
+      $('#sidebar').classList.add('collapsed');
+    }
+  });
+});
+
+// 初始化：手机端默认折叠
+(function initSidebar(){
+  const saved = localStorage.getItem('tan_sidebar');
+  if(saved === '1'){
+    $('#sidebar').classList.add('collapsed');
+  } else if(saved === null && window.innerWidth < 768){
+    $('#sidebar').classList.add('collapsed');
+  }
+})();
+
+/* ============================================================
+   AI 智能输入浮窗 - 本地规则识别
+   ============================================================ */
+const AI = {
+  parse(text){
+    const t = text.trim();
+    if(!t) return null;
+    const result = {raw:t, matched:[], suggestions:[]};
+
+    // 1. 订单识别：包含"订单"、"几号有"、"花"等 + 状态/款式
+    const orderMatch = /(?:订单|几号.*(?:有|来)|(?:做|订|要).*(?:花|束|捧))/.test(t) || /(玫瑰|康乃馨|百合|向日葵|郁金香|花束|捧花|花篮|开业|婚|生(?:日|日花))/.test(t);
+    if(orderMatch){
+      // 日期
+      const dateM = t.match(/(\d{1,2})月(\d{1,2})号?/) || t.match(/(\d{1,2})号/) || t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      let orderDate = today();
+      if(dateM){
+        const m = dateM[1].length===4 ? dateM[2] : dateM[1];
+        const d = dateM[1].length===4 ? dateM[3] : dateM[2];
+        orderDate = `${new Date().getFullYear()}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      // 状态
+      let status='paid';
+      if(/已(?:付|付款)|定金|尾款/.test(t)) status='paid';
+      if(/制作|做中|准备/.test(t)) status='making';
+      if(/配(?:送|货)|发货|送到/.test(t)) status='delivery';
+      if(/完成|已完|做好/.test(t)) status='done';
+      // 款式
+      const styleM = t.match(/((?:粉|红|白|黄|紫|蓝|香槟|彩色?)?(?:玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利)?(?:花束|捧花|花篮|花盒|开业花篮|桌花)?)/);
+      // 配送方式
+      const delivery = /配(?:送|货)|送到|发货/.test(t) ? 'delivery' : (/自提|到店/.test(t) ? 'pickup' : 'delivery');
+      // 联系方式
+      const phoneM = t.match(/1[3-9]\d{9}/);
+      // 收花人
+      const recipM = t.match(/(?:收花人|给|送)[：:\s]*([^\s,，。.!！]{1,10})/);
+
+      const order = {
+        id:uid(), createdAt:now(), doneDate: status==='done'?now():null,
+        orderDate, useTime:'', style: styleM?styleM[1]:'花束',
+        status, deliveryType: delivery,
+        recipient: recipM?recipM[1]:'', contact: phoneM?phoneM[0]:'',
+        address:'', card:'', note: t
+      };
+      DB.orders.push(order); saveDB();
+      result.matched.push({type:'订单', desc:`${order.style} · ${ORDER_STATUS.find(s=>s.key===status).label}`});
+    }
+
+    // 2. 记账识别：花费/收入/金额
+    if(/花(?:了|费|销)|支出|买|进(?:货|花)|付|充|交/.test(t) || /收入|收(?:到|入)|赚|卖/.test(t)){
+      const amtM = t.match(/(\d+(?:\.\d{1,2})?)\s*(?:块|元|￥|¥|元)?/);
+      if(amtM){
+        const amount = +amtM[1];
+        const isIncome = /收入|收到|赚|卖|进账/.test(t);
+        let cat = isIncome ? '工作室收入' : '其他';
+        // 支出分类匹配
+        const catMap = {'进花|花材|玫瑰|康乃馨|百合':'进花','资材|包装|丝带|花泥|纸':'资材','跑腿|外卖|配送费':'跑腿','水电|电费|水费':'水电费','房租|租金':'房租','物业':'物业费','车位|停车':'车位费','吃|饭|餐|食|咖啡':'餐饮','车|地铁|公交|打车|滴滴':'交通','买|购|淘宝|京东':'购物','玩|游戏|电影|娱乐':'娱乐','房|租':'住房','医|药|看病':'医疗','学|课|书|培训':'教育','工资|薪':'工资','理财|基金|股票':'理财'};
+        if(!isIncome){
+          for(const k in catMap){ if(new RegExp(k).test(t)){ cat=catMap[k]; break; } }
+        } else {
+          if(/理财|基金|股票|利息/.test(t)) cat='理财收益';
+        }
+        DB.account.push({id:uid(), type:isIncome?'income':'expense', amount, date:today(), cat, note:t.replace(amtM[0],'').trim().slice(0,40)});
+        saveDB();
+        result.matched.push({type:isIncome?'收入':'支出', desc:`${cat} ${fmtMoney(amount)}`});
+      }
+    }
+
+    // 3. 倒计时识别：日期+生日/纪念日/节日
+    if(/生日|纪念日|结婚|过节|圣诞|元旦|新年|春节|情人|母亲节|父亲节|教师节|婚礼|纪念日|几号/.test(t)){
+      const dateM = t.match(/(\d{1,2})月(\d{1,2})号?/) || t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if(dateM){
+        const m = dateM[1].length===4 ? dateM[2] : dateM[1];
+        const d = dateM[1].length===4 ? dateM[3] : dateM[2];
+        const date = `${dateM[1].length===4?dateM[1]:new Date().getFullYear()}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const nameM = t.match(/([妈妈爸姐弟妹老婆老公儿子女儿闺蜜朋友]+(?:生日|纪念日))|((?:结婚|婚礼|圣诞|元旦|新年|春节|情人|母亲节|父亲节|教师节)(?:节)?)|(.{2,8}(?:生日|纪念日|结婚))/);
+        const name = nameM ? (nameM[1]||nameM[2]||nameM[3]) : '重要日期';
+        DB.countdowns.push({id:uid(), name, date, note:t});
+        saveDB();
+        result.matched.push({type:'倒计时', desc:`${name} · ${date}`});
+      }
+    }
+
+    // 4. 花材库存识别
+    if(/剩|库存|还有|进(?:了|货)|补(?:货)?/.test(t) && /(玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利|花材|支|把|束)/.test(t)){
+      const amtM = t.match(/(\d+)\s*(?:支|把|束)?/);
+      const flowerM = t.match(/(粉(?:色)?|红(?:色)?|白(?:色)?|黄(?:色)?|紫(?:色)?|香槟)?\s*(玫瑰|康乃馨|百合|向日葵|郁金香|绣球|满天星|洋桔梗|尤加利)/);
+      if(amtM && flowerM){
+        const name = (flowerM[1]||'')+flowerM[2];
+        const qty = /剩|还有|库存/.test(t) ? +amtM[1] : +amtM[1];
+        const existing = DB.stock.find(s=>s.name.includes(flowerM[2]));
+        if(existing){ existing.qty = /进|补/.test(t) ? (+existing.qty + qty) : qty; }
+        else { DB.stock.push({id:uid(), name, unit:'支', qty, min:5, price:0, supplier:''}); }
+        saveDB();
+        result.matched.push({type:'花材', desc:`${name} ${qty}支`});
+      }
+    }
+
+    // 5. 打卡/心情识别
+    const moodMap = {'开心|高兴|快乐|心情好|不错|棒|完美|开心':'😄','平静|还行|一般|普通':'🙂','低落|不好|烦|累|疲惫|心情差':'😔','难过|伤心|糟糕|崩溃|哭':'😢'};
+    if(/心情|开心|高兴|快乐|难过|烦|累|今天|打卡/.test(t)){
+      let mood=4, moodLabel='平静';
+      if(/开心|高兴|快乐|心情好|不错|棒|完美|好/.test(t)){ mood=5; moodLabel='开心'; }
+      else if(/难过|伤心|糟糕|崩溃|哭|很差/.test(t)){ mood=1; moodLabel='糟糕'; }
+      else if(/低落|不好|烦|累|疲惫|心情差|郁闷/.test(t)){ mood=2; moodLabel='低落'; }
+      else if(/一般|还行|普通/.test(t)){ mood=3; moodLabel='一般'; }
+      if(/心情|今天|开心|高兴|难过|烦|累/.test(t) && !result.matched.length){
+        const existing = DB.checkins.find(x=>x.date===today());
+        if(existing){ existing.mood=mood; existing.note=t; }
+        else { DB.checkins.push({id:uid(),date:today(),mood,note:t}); }
+        saveDB();
+        result.matched.push({type:'打卡', desc:`心情 ${moodLabel} ${MOODS.find(m=>m.v===mood).e}`});
+      }
+    }
+
+    return result.matched.length ? result : null;
+  }
+};
+
+/* AI 浮窗交互 */
+let aiOpen=false;
+const fab=$('#fab'), aiPanel=$('#aiPanel'), aiInput=$('#aiInput'), aiLog=$('#aiLog'), aiSend=$('#aiSend');
+function toggleAI(open){ aiOpen = open===undefined ? !aiOpen : open; aiPanel.classList.toggle('open', aiOpen); if(aiOpen) setTimeout(()=>aiInput.focus(),200); }
+fab.addEventListener('click', ()=>toggleAI());
+$('#aiClose').addEventListener('click', ()=>toggleAI(false));
+$$('.ai-chip').forEach(c=>c.addEventListener('click', ()=>{ aiInput.value=c.textContent; aiInput.focus(); }));
+aiSend.addEventListener('click', sendAI);
+aiInput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendAI(); });
+
+function addMsg(text, who){
+  const div=document.createElement('div');
+  div.className='ai-msg '+(who||'bot');
+  div.innerHTML=text;
+  aiLog.appendChild(div); aiLog.scrollTop=aiLog.scrollHeight;
+}
+function sendAI(){
+  const text=aiInput.value.trim(); if(!text) return;
+  addMsg(escape(text), 'user');
+  aiInput.value='';
+  setTimeout(()=>{
+    const r = AI.parse(text);
+    if(r){
+      let html = '已识别并记录：<br>';
+      r.matched.forEach(m=>{ html += `<b>✓ ${escape(m.type)}</b>：${escape(m.desc)}<br>`; });
+      html += '<span class="small muted">已写入对应模块</span>';
+      addMsg(html);
+      if(currentView==='orders'||currentView==='account'||currentView==='countdown'||currentView==='stock'||currentView==='checkin') switchView(currentView);
+    } else {
+      addMsg('没太明白呢 😅 可以试试：<br>• "5号有订单 粉色玫瑰 已付款"<br>• "花了50块进花"<br>• "3月8号 妈妈生日"<br>• "心情很好"');
+    }
+  }, 300);
+}
+
+/* ===== Init ===== */
+switchView('orders');
+// 初始 demo 数据（首次使用）
+if(!DB.orders.length && !DB.account.length && !localStorage.getItem('tan_seeded')){
+  localStorage.setItem('tan_seeded','1');
+  DB.countdowns.push(
+    {id:uid(), name:'妈妈生日', date:`${new Date().getFullYear()}-12-20`, note:'记得提前订花'},
+    {id:uid(), name:'情人节', date:`${new Date().getFullYear()}-02-14`, note:''}
+  );
+  DB.stock.push(
+    {id:uid(), name:'粉色玫瑰', unit:'支', qty:30, min:10, price:3, supplier:'花卉市场'},
+    {id:uid(), name:'康乃馨', unit:'支', qty:8, min:15, price:2, supplier:'花卉市场'}
+  );
+  saveDB();
+}
+</script>
+</body>
+</html>
