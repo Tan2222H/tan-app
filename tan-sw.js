@@ -1,7 +1,7 @@
-const CACHE = 'tan-v1';
+const CACHE = 'tan-v2';
 const ASSETS = [
-  '/',
-  '/tanhui-workbench.html',
+  '/tan-app/',
+  '/tan-app/index.html',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
@@ -20,15 +20,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(resp => {
-        if(resp.ok){
-          const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(e.request).then(resp => {
+      if(resp.ok && resp.status === 200){
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    }).catch(() => caches.match(e.request))
   );
 });
