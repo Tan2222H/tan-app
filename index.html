@@ -995,12 +995,28 @@ function renderBackup(){
 /* ===== 导入导出 ===== */
 function exportJSON(){
   const data = JSON.stringify({...DB, exportedAt:now()}, null, 2);
-  const blob = new Blob([data], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `tan_backup_${today()}.json`;
-  a.click(); URL.revokeObjectURL(a.href);
-  toast('已导出备份');
+  // iOS Safari 不支持 a.download，用剪贴板 + 新窗口双保险
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(data).then(()=>{
+      toast('备份已复制到剪贴板！打开备忘录粘贴保存');
+    }).catch(()=>{
+      openExportWindow(data);
+    });
+  } else {
+    openExportWindow(data);
+  }
+}
+function openExportWindow(data){
+  const w = window.open('', '_blank');
+  if(w){
+    w.document.write('<html><head><title>TAN备份</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:16px;font-family:monospace;font-size:12px;word-break:break-all"><p style="color:#666;margin-bottom:10px">长按下方文字 → 全选 → 复制，粘贴到备忘录保存</p><div id="d">'+data.replace(/</g,'&lt;')+'</div><script>document.getElementById("d").addEventListener("click",function(){var r=document.createRange();r.selectNode(this);getSelection().removeAllRanges();getSelection().addRange(r)})</script></body></html>');
+    w.document.close();
+    toast('新窗口已打开，长按文字复制');
+  } else {
+    // 最后兜底：直接在页面显示
+    openModal('备份数据（长按复制）', '<textarea style="width:100%;height:300px;font-size:11px;font-family:monospace" readonly onclick="this.select()">'+data.replace(/</g,'&lt;')+'</textarea>', '<button class="btn" onclick="closeModal()">关闭</button>');
+    toast('长按文本框全选复制');
+  }
 }
 function importJSON(file){
   const reader = new FileReader();
