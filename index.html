@@ -456,6 +456,11 @@ function loadDB(){
 function saveDB(){
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+    // 自动备份：保留最近5次
+    const backups = JSON.parse(localStorage.getItem('tan_auto_backups')||'[]');
+    backups.unshift({time:now(), data:JSON.parse(JSON.stringify(DB))});
+    if(backups.length > 5) backups.length = 5;
+    localStorage.setItem('tan_auto_backups', JSON.stringify(backups));
   } catch(e) {
     if(e.name === 'QuotaExceededError' || e.message.includes('quota')){
       openModal('存储空间已满', `<p>照片占用了太多空间。建议：</p><ul style="margin:10px 0 10px 20px;line-height:1.8"><li>删除一些旧订单的照片</li><li>在「备份与恢复」中清空所有数据</li></ul>`, '<button class="btn" onclick="closeModal()">关闭</button>');
@@ -1017,10 +1022,30 @@ function renderBackup(){
       <div class="small muted" style="margin-top:12px">备份文件大小：约 ${(size/1024).toFixed(1)} KB</div>
     </div>
     <div class="card">
+      <div class="card-h"><h3>自动备份</h3><span class="sub">每次保存自动备份最近5次</span></div>
+      <div class="list" id="autoBackupList"></div>
+    </div>
+    <div class="card">
       <div class="card-h"><h3>关于</h3></div>
       <p class="small muted">TAN v1.0 · 纯前端单文件应用<br>数据完全本地存储，不会上传到任何服务器。</p>
     </div>
   `;
+  // 渲染自动备份列表
+  const backups = JSON.parse(localStorage.getItem('tan_auto_backups')||'[]');
+  const abList = $('#autoBackupList');
+  if(!backups.length){
+    abList.innerHTML = '<div class="small muted" style="padding:8px 0">暂无自动备份</div>';
+  } else {
+    abList.innerHTML = backups.map((b,i)=>`
+      <div class="list-item" style="padding:10px 12px">
+        <div class="li-main">
+          <div class="small">备份 ${i+1} · ${new Date(b.time).toLocaleString('zh-CN')}</div>
+          <div class="small muted">订单 ${b.data.orders?.length||0} 条 · 记账 ${b.data.account?.length||0} 条</div>
+        </div>
+        <button class="btn btn-sm" onclick="restoreAutoBackup(${i})">恢复</button>
+      </div>
+    `).join('');
+  }
   $('#bExport').addEventListener('click',exportJSON);
   $('#fileImport2').addEventListener('change', e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; });
   $('#bPaste').addEventListener('click',()=>{
@@ -1033,6 +1058,19 @@ function renderBackup(){
     const text = $('#pasteArea').value;
     if(!text || !text.trim()){ toast('请先粘贴备份内容'); return; }
     importFromText(text);
+  };
+  window.restoreAutoBackup = function(idx){
+    const backups = JSON.parse(localStorage.getItem('tan_auto_backups')||'[]');
+    const b = backups[idx];
+    if(!b){ toast('备份不存在'); return; }
+    openModal('恢复备份', `<p style="padding:10px 0">将恢���到 ${new Date(b.time).toLocaleString('zh-CN')} 的状态：<br>• 订单 ${b.data.orders?.length||0} 条<br>• 记账 ${b.data.account?.length||0} 条<br><br>当前数据将被覆盖，是否继续？</p>`,
+      `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doRestoreAuto(${idx})">恢复</button>`);
+  };
+  window.doRestoreAuto = function(idx){
+    const backups = JSON.parse(localStorage.getItem('tan_auto_backups')||'[]');
+    const b = backups[idx];
+    DB = b.data;
+    saveDB(); closeModal(); switchView(currentView); toast('已恢复');
   };
   $('#bClear').addEventListener('click',()=>{
     openModal('清空数据', `<p style="padding:10px 0;color:#A890A0">⚠ 此操作将删除所有数据，且无法恢复。建议先导出备份。</p>`,
@@ -1047,13 +1085,28 @@ function renderBackup(){
 /* ===== 导入导出 ===== */
 function exportJSON(){
   const data = JSON.stringify({...DB, exportedAt:now()}, null, 2);
-  // iOS Safari 不支持 a.download，用剪贴板 + 新窗口双保险
+  // 方案1：用 Blob 下载文件（用户主动点击触发）
+  try {
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tan_backup_' + today() + '.json';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    toast('备份文件已下载，可在「文件」App中找到');
+    return;
+  } catch(e) {}
+  // 方案2：复制到剪贴板
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(data).then(()=>{
-      toast('备份已复制到剪贴板！打开备忘录粘贴保存');
-    }).catch(()=>{
-      openExportWindow(data);
-    });
+      toast('备份已复制到剪贴板');
+    }).catch(()=>{ openExportWindow(data); });
   } else {
     openExportWindow(data);
   }
