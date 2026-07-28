@@ -544,6 +544,11 @@ function drawOrders(filter){
           ${o.deliveryType==='delivery'&&o.address?`<span>📍 ${escape(o.address)}</span>`:''}
         </div>
         ${o.card?`<div class="li-sub" style="margin-top:4px;color:var(--ink2)">💌 ${escape(o.card)}</div>`:''}
+        ${(o.price||o.errandCost||o.errandIncome)?`<div class="li-sub" style="margin-top:4px">
+          ${o.price?`<span class="tag tag-income">💰 ¥${o.price}</span>`:''}
+          ${o.errandCost?`<span class="tag tag-expense">🛵 支出 ¥${o.errandCost}</span>`:''}
+          ${o.errandIncome?`<span class="tag tag-income">🛵 收入 ¥${o.errandIncome}</span>`:''}
+        </div>`:''}
         ${(o.photo1||o.photo2)?`<div class="photo-thumbs"><img src="${o.photo1||''}" ${o.photo1?'':'hidden'}><img src="${o.photo2||''}" ${o.photo2?'':'hidden'}></div>`:''}
         ${o.note?`<div class="li-sub" style="margin-top:4px">📝 ${escape(o.note)}</div>`:''}
       </div>
@@ -563,7 +568,7 @@ function drawOrders(filter){
   box.querySelectorAll('[data-edit]').forEach(el=>el.addEventListener('click',()=>orderForm(el.dataset.edit)));
   box.querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',()=>{
     const o = DB.orders.find(x=>x.id===el.dataset.del);
-    confirmDel(o.style||o.recipient||'订单', ()=>{ DB.orders = DB.orders.filter(x=>x.id!==el.dataset.del); saveDB(); renderOrders(); toast('已删除'); });
+    confirmDel(o.style||o.recipient||'订单', ()=>{ DB.orders = DB.orders.filter(x=>x.id!==el.dataset.del); DB.account = DB.account.filter(a=>a.orderId!==el.dataset.del); saveDB(); renderOrders(); toast('已删除'); });
   }));
 }
 function orderForm(id){
@@ -587,6 +592,12 @@ function orderForm(id){
       <div class="field"><label>配送地址（配送时填）</label><input type="text" id="f_address" value="${escape(o.address||'')}"></div>
     </div>
     <div class="field" style="margin-top:10px"><label>卡片内容</label><textarea id="f_card" placeholder="写在花束卡片上的话">${escape(o.card||'')}</textarea></div>
+    <div class="form-row r3" style="margin-top:10px">
+      <div class="field"><label>订单价格</label><input type="number" id="f_price" placeholder="0" value="${o.price||''}"></div>
+      <div class="field"><label>跑腿支出</label><input type="number" id="f_errandCost" placeholder="0" value="${o.errandCost||''}"></div>
+      <div class="field"><label>跑腿收入</label><input type="number" id="f_errandIncome" placeholder="0" value="${o.errandIncome||''}"></div>
+    </div>
+    <div class="small muted" style="margin-top:4px">保存后订单价格、跑腿收支会自动记入记账本</div>
     <div class="field" style="margin-top:10px"><label>花束照片</label>
       <div class="photo-row">
         <label class="photo-box" id="photoBox1" style="${o.photo1?'background-image:url('+o.photo1+');background-size:cover;background-position:center':''}">
@@ -617,10 +628,32 @@ function orderForm(id){
       note: $('#f_note').value.trim(),
       photo1: photoTemp[1] || (id ? o.photo1 : '') || '',
       photo2: photoTemp[2] || (id ? o.photo2 : '') || '',
+      price: +$('#f_price').value || 0,
+      errandCost: +$('#f_errandCost').value || 0,
+      errandIncome: +$('#f_errandIncome').value || 0,
     };
     photoTemp = {};
-    if(id){ Object.assign(o, data); }
-    else { DB.orders.push({id:uid(), createdAt:now(), doneDate: data.status==='done'?now():null, ...data}); }
+    if(id){
+      // 编辑时先删除该订单关联的旧记账记录
+      DB.account = DB.account.filter(a => !(a.orderId === id));
+      Object.assign(o, data);
+    } else {
+      const newOrder = {id:uid(), createdAt:now(), doneDate: data.status==='done'?now():null, ...data};
+      DB.orders.push(newOrder);
+      id = newOrder.id;
+    }
+    // 自动写入记账本
+    const accDate = data.orderDate || today();
+    const orderLabel = `${data.style||'花束'}${data.recipient?'·'+data.recipient:''}`;
+    if(data.price > 0){
+      DB.account.push({id:uid(), orderId:id, type:'income', amount:data.price, date:accDate, cat:'工作室收入', note:'订单收入 '+orderLabel});
+    }
+    if(data.errandCost > 0){
+      DB.account.push({id:uid(), orderId:id, type:'expense', amount:data.errandCost, date:accDate, cat:'跑腿', note:'跑腿支出 '+orderLabel});
+    }
+    if(data.errandIncome > 0){
+      DB.account.push({id:uid(), orderId:id, type:'income', amount:data.errandIncome, date:accDate, cat:'工作室收入', note:'跑腿收入 '+orderLabel});
+    }
     saveDB(); closeModal(); renderOrders(); toast(id?'已更新':'已添加');
   });
   // 图片上传
