@@ -1014,7 +1014,7 @@ function exportJSON(){
 function openExportWindow(data){
   const w = window.open('', '_blank');
   if(w){
-    w.document.write('<html><head><title>TAN备份</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:16px;font-family:monospace;font-size:12px;word-break:break-all"><p style="color:#666;margin-bottom:10px">长按下方文字 → 全选 → 复制，粘贴到备忘录保存</p><div id="d">'+data.replace(/</g,'&lt;')+'</div><script>document.getElementById("d").addEventListener("click",function(){var r=document.createRange();r.selectNode(this);getSelection().removeAllRanges();getSelection().addRange(r)})</script></body></html>');
+    w.document.write('<html><head><title>TAN备份</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:16px;font-family:monospace;font-size:12px;word-break:break-all"><p style="color:#666;margin-bottom:10px">长按下方文字 → 全选 → 复制，粘贴到备忘录保存</p><div id="d">'+data.replace(/</g,'&lt;')+'</div><scr'+'ipt>document.getElementById("d").addEventListener("click",function(){var r=document.createRange();r.selectNode(this);getSelection().removeAllRanges();getSelection().addRange(r)})</scr'+'ipt></body></html>');
     w.document.close();
     toast('新窗口已打开，长按文字复制');
   } else {
