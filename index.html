@@ -594,8 +594,8 @@ function orderForm(id){
     <div class="field" style="margin-top:10px"><label>卡片内容</label><textarea id="f_card" placeholder="写在花束卡片上的话">${escape(o.card||'')}</textarea></div>
     <div class="form-row r3" style="margin-top:10px">
       <div class="field"><label>订单价格</label><input type="number" id="f_price" placeholder="0" value="${o.price||''}"></div>
-      <div class="field"><label>跑腿支出</label><input type="number" id="f_errandCost" placeholder="0" value="${o.errandCost||''}"></div>
       <div class="field"><label>跑腿收入</label><input type="number" id="f_errandIncome" placeholder="0" value="${o.errandIncome||''}"></div>
+      <div class="field"><label>跑腿支出</label><input type="number" id="f_errandCost" placeholder="0" value="${o.errandCost||''}"></div>
     </div>
     <div class="small muted" style="margin-top:4px">保存后订单价格、跑腿收支会自动记入记账本</div>
     <div class="field" style="margin-top:10px"><label>花束照片</label>
