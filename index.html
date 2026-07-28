@@ -615,6 +615,7 @@ function orderForm(id){
   openModal(id?'编辑订单':'新建订单', body,
     `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="saveOrder">保存</button>`);
   $('#saveOrder').addEventListener('click', ()=>{
+    try{
     const data = {
       orderDate: $('#f_orderDate').value,
       useTime: $('#f_useTime').value.trim(),
@@ -633,6 +634,7 @@ function orderForm(id){
       errandIncome: +$('#f_errandIncome').value || 0,
     };
     photoTemp = {};
+    let orderId = id;
     if(id){
       // 编辑时先删除该订单关联的旧记账记录
       DB.account = DB.account.filter(a => !(a.orderId === id));
@@ -640,21 +642,22 @@ function orderForm(id){
     } else {
       const newOrder = {id:uid(), createdAt:now(), doneDate: data.status==='done'?now():null, ...data};
       DB.orders.push(newOrder);
-      id = newOrder.id;
+      orderId = newOrder.id;
     }
     // 自动写入记账本
     const accDate = data.orderDate || today();
     const orderLabel = `${data.style||'花束'}${data.recipient?'·'+data.recipient:''}`;
     if(data.price > 0){
-      DB.account.push({id:uid(), orderId:id, type:'income', amount:data.price, date:accDate, cat:'工作室收入', note:'订单收入 '+orderLabel});
+      DB.account.push({id:uid(), orderId:orderId, type:'income', amount:data.price, date:accDate, cat:'工作室收入', note:'订单收入 '+orderLabel});
     }
     if(data.errandCost > 0){
-      DB.account.push({id:uid(), orderId:id, type:'expense', amount:data.errandCost, date:accDate, cat:'跑腿', note:'跑腿支出 '+orderLabel});
+      DB.account.push({id:uid(), orderId:orderId, type:'expense', amount:data.errandCost, date:accDate, cat:'跑腿', note:'跑腿支出 '+orderLabel});
     }
     if(data.errandIncome > 0){
-      DB.account.push({id:uid(), orderId:id, type:'income', amount:data.errandIncome, date:accDate, cat:'工作室收入', note:'跑腿收入 '+orderLabel});
+      DB.account.push({id:uid(), orderId:orderId, type:'income', amount:data.errandIncome, date:accDate, cat:'工作室收入', note:'跑腿收入 '+orderLabel});
     }
     saveDB(); closeModal(); renderOrders(); toast(id?'已更新':'已添加');
+    }catch(err){ toast('保存失败: '+err.message); console.error(err); }
   });
   // 图片上传
   document.querySelectorAll('.photo-input').forEach(inp => {
