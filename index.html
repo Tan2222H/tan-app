@@ -782,10 +782,15 @@ function renderAccount(){
     $$('#accFilter button').forEach(b=>b.classList.remove('on'));
     e.target.classList.add('on'); accFilter=e.target.dataset.f; drawAcc();
   });
-  drawPie(monthRecs); drawAcc();
+  try { drawPie(monthRecs); } catch(e){ console.error('pie error:', e); }
+  try { drawAcc(); } catch(e){ console.error('acc error:', e); }
 }
 function drawPie(recs){
   const ctx = $('#pieChart'); if(!ctx) return;
+  if(typeof Chart === 'undefined'){
+    ctx.parentElement.innerHTML = '<div class="empty"><div class="empty-ico">📊</div>图表加载中…</div>';
+    return;
+  }
   const exp = recs.filter(a=>a.type==='expense');
   const byCat = {};
   exp.forEach(a=>{ byCat[a.cat]=(byCat[a.cat]||0)+(+a.amount||0); });
