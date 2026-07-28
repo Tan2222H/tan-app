@@ -316,6 +316,10 @@
   .photo-box .photo-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer}
   .photo-thumbs{display:flex;gap:6px;margin-top:6px}
   .photo-thumbs img{width:50px;height:50px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
+  .photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .photo-item{position:relative;width:80px;height:80px;border-radius:10px;background-size:cover;background-position:center;border:1px solid var(--line)}
+  .photo-item-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+  .photo-add-btn{margin-top:4px}
 
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
   .gal-item{background:var(--card);border-radius:var(--radius);padding:14px;border:1px solid rgba(232,216,216,.5);cursor:pointer;transition:all .15s}
@@ -418,7 +422,7 @@
    ============================================================ */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-let photoTemp = {};
+let photoList = [];
 
 // 图片压缩工具
 function compressImage(dataUrl, maxWidth, quality, callback){
@@ -577,7 +581,7 @@ function drawOrders(filter){
           ${o.errandCost?`<span class="tag tag-expense">🛵 支出 ¥${o.errandCost}</span>`:''}
           ${o.errandIncome?`<span class="tag tag-income">🛵 收入 ¥${o.errandIncome}</span>`:''}
         </div>`:''}
-        ${(o.photo1||o.photo2)?`<div class="photo-thumbs"><img src="${o.photo1||''}" ${o.photo1?'':'hidden'}><img src="${o.photo2||''}" ${o.photo2?'':'hidden'}></div>`:''}
+        ${(o.photos&&o.photos.length)?`<div class="photo-thumbs">${o.photos.map(p=>`<img src="${p}">`).join('')}</div>`:''}
         ${o.note?`<div class="li-sub" style="margin-top:4px">📝 ${escape(o.note)}</div>`:''}
       </div>
       <div class="li-actions">
@@ -601,7 +605,7 @@ function drawOrders(filter){
 }
 function orderForm(id){
   const o = id ? DB.orders.find(x=>x.id===id) : {};
-  photoTemp = {1: '', 2: ''};
+  photoList = (o.photos || []).slice();
   const body = `
     <div class="form-row r2">
       <div class="field"><label>订单时间</label><input type="date" id="f_orderDate" value="${o.orderDate||today()}"></div>
@@ -627,16 +631,8 @@ function orderForm(id){
     </div>
     <div class="small muted" style="margin-top:4px">保存后订单价格、跑腿收支会自动记入记账本</div>
     <div class="field" style="margin-top:10px"><label>花束照片</label>
-      <div class="photo-row">
-        <label class="photo-box" id="photoBox1" style="${o.photo1?'background-image:url('+o.photo1+');background-size:cover;background-position:center':''}">
-          ${o.photo1?'':'<span>+</span><small>照片1</small>'}
-          <input type="file" accept="image/*" class="photo-input" data-idx="1" style="display:none">
-        </label>
-        <label class="photo-box" id="photoBox2" style="${o.photo2?'background-image:url('+o.photo2+');background-size:cover;background-position:center':''}">
-          ${o.photo2?'':'<span>+</span><small>照片2</small>'}
-          <input type="file" accept="image/*" class="photo-input" data-idx="2" style="display:none">
-        </label>
-      </div>
+      <div class="photo-list" id="photoList"></div>
+      <button type="button" class="btn btn-sm photo-add-btn" id="photoAddBtn">＋ 添加照片</button>
     </div>
     <div class="field" style="margin-top:10px"><label>备注</label><textarea id="f_note" placeholder="其他备注信息">${escape(o.note||'')}</textarea></div>
   `;
@@ -655,13 +651,12 @@ function orderForm(id){
       address: $('#f_address').value.trim(),
       card: $('#f_card').value.trim(),
       note: $('#f_note').value.trim(),
-      photo1: photoTemp[1] || (id ? o.photo1 : '') || '',
-      photo2: photoTemp[2] || (id ? o.photo2 : '') || '',
+      photos: photoList.slice(),
       price: +$('#f_price').value || 0,
       errandCost: +$('#f_errandCost').value || 0,
       errandIncome: +$('#f_errandIncome').value || 0,
     };
-    photoTemp = {};
+    photoList = [];
     let orderId = id;
     if(id){
       // 编辑时先删除该订单关联的旧记账记录
@@ -687,42 +682,48 @@ function orderForm(id){
     saveDB(); closeModal(); renderOrders(); toast(id?'已更新':'已添加');
     }catch(err){ toast('保存失败: '+err.message); console.error(err); }
   });
-  // 图片上传
-  document.querySelectorAll('.photo-input').forEach(inp => {
-    inp.addEventListener('change', function(){
-      const file = this.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e){
-        // 压缩图片再保存
-        compressImage(e.target.result, 800, 0.7, function(compressed){
-          const idx = inp.dataset.idx;
-          photoTemp[idx] = compressed;
-          const box = document.getElementById('photoBox'+(idx));
-          box.style.backgroundImage = 'url('+compressed+')';
-          box.style.backgroundSize = 'cover';
-          box.style.backgroundPosition = 'center';
-          box.innerHTML = '<small class="photo-del" data-idx="'+idx+'">✕</small>';
-          box.querySelector('.photo-del').addEventListener('click', function(ev){
-            ev.stopPropagation(); ev.preventDefault();
-            photoTemp[idx] = '';
-            box.style.backgroundImage = '';
-            box.innerHTML = '<span>+</span><small>照片'+(idx)+'</small>';
-            const fi = box.querySelector('input');
-            if(fi) fi.value = '';
-            initPhotoInputs();
-          });
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  });
-  function initPhotoInputs(){
-    document.querySelectorAll('.photo-input').forEach(inp => {
-      inp.addEventListener('click', function(e){ e.stopPropagation(); });
+  // 动态照片列表
+  const photoListEl = $('#photoList');
+  const photoAddBtn = $('#photoAddBtn');
+  let fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+
+  function renderPhotoList(){
+    if(!photoList.length){
+      photoListEl.innerHTML = '<div class="small muted">暂无照片，点击下方添加</div>';
+      return;
+    }
+    photoListEl.innerHTML = photoList.map((src, i) => `
+      <div class="photo-item" style="background-image:url('${src}')">
+        <button type="button" class="photo-item-del" data-idx="${i}">✕</button>
+      </div>
+    `).join('');
+    photoListEl.querySelectorAll('.photo-item-del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        const idx = +btn.dataset.idx;
+        photoList.splice(idx, 1);
+        renderPhotoList();
+      });
     });
   }
-  initPhotoInputs();
+  photoAddBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', function(){
+    const file = this.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      compressImage(e.target.result, 800, 0.7, function(compressed){
+        photoList.push(compressed);
+        renderPhotoList();
+        fileInput.value = '';
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+  renderPhotoList();
 }
 
 /* ============================================================
