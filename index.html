@@ -14,10 +14,22 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' rx='8' fill='%23DCD3E8'/><text x='16' y='23' font-family='-apple-system,sans-serif' font-size='14' font-weight='700' fill='white' text-anchor='middle'>T</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-  // PWA Service Worker - 先禁用避免缓存问题
+  // PWA Service Worker - 注册新版(强清理旧缓存) + 注销所有旧版
   if('serviceWorker' in navigator){
+    // 先注册新版 SW（v3），它会清理所有旧缓存
+    navigator.serviceWorker.register('./tan-sw.js').catch(()=>{});
+    // 再扫描注销所有 SW（双保险，下次加载会用最新代码）
     navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(r => r.unregister());
+      // 注销非当前scope或非v3的旧SW
+      regs.forEach(r => {
+        // 保留刚注册的v3，其余注销
+        r.update();
+      });
+    });
+    // 监听新SW激活后强制刷新一次
+    let refreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if(!refreshed){ refreshed = true; location.reload(); }
     });
   }
 </script>
@@ -511,6 +523,22 @@ function confirmDel(name, cb){
     `<button class="btn" onclick="closeModal()">取消</button><button class="btn btn-primary" id="delConfirm">删除</button>`);
   $('#delConfirm').addEventListener('click', ()=>{ closeModal(); cb(); });
 }
+// 强制刷新：注销所有SW + 清空所有缓存 + 重新加载，用于解决缓存旧版本问题
+async function forceRefresh(){
+  try {
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if('caches' in window){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch(e){ console.error('forceRefresh error:', e); }
+  // 加随机参数强制跳过任何HTTP缓存
+  location.href = location.pathname + '?v=' + Date.now();
+}
+window.forceRefresh = forceRefresh;
 
 /* ============================================================
    1. 订单模块
@@ -1029,7 +1057,11 @@ function renderBackup(){
     </div>
     <div class="card">
       <div class="card-h"><h3>关于</h3></div>
-      <p class="small muted">TAN v1.0 · 纯前端单文件应用<br>数据完全本地存储，不会上传到任何服务器。</p>
+      <p class="small muted">TAN v1.3 · 纯前端单文件应用<br>数据完全本地存储，不会上传到任何服务器。</p>
+      <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn" id="bForce" style="color:#7A8BA8">🔄 强制刷新应用</button>
+      </div>
+      <div class="small muted" style="margin-top:8px">如果页面显示异常或功能丢失，点「强制刷新」清理缓存加载最新版本。</div>
     </div>
   `;
   // 渲染自动备份列表
@@ -1050,6 +1082,7 @@ function renderBackup(){
   }
   $('#bExport').addEventListener('click',exportJSON);
   $('#fileImport2').addEventListener('change', e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; });
+  try { $('#bForce').addEventListener('click', forceRefresh); } catch(e){ console.error('bForce bind:', e); }
   $('#bPaste').addEventListener('click',()=>{
     openModal('粘贴备份数据', `
       <p class="small muted" style="margin-bottom:10px">从备忘录复制备份内容，粘贴到下方框中，点「导入」</p>
