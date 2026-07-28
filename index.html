@@ -781,12 +781,14 @@ function renderAccount(){
       <div class="card"><div class="card-h"><h3>记录总数</h3></div><div class="stat-val">${DB.account.length}<small>条</small></div></div>
     </div>
   `;
-  $('#addAcc').addEventListener('click', ()=>accForm());
-  $('#accFilter').addEventListener('click', e=>{
-    if(e.target.tagName!=='BUTTON') return;
-    $$('#accFilter button').forEach(b=>b.classList.remove('on'));
-    e.target.classList.add('on'); accFilter=e.target.dataset.f; drawAcc();
-  });
+  try { $('#addAcc').addEventListener('click', ()=>accForm()); } catch(e){}
+  try {
+    $('#accFilter').addEventListener('click', e=>{
+      if(e.target.tagName!=='BUTTON') return;
+      $$('#accFilter button').forEach(b=>b.classList.remove('on'));
+      e.target.classList.add('on'); accFilter=e.target.dataset.f; drawAcc();
+    });
+  } catch(e){}
   try { drawPie(monthRecs); } catch(e){ console.error('pie error:', e); }
   try { drawAcc(); } catch(e){ console.error('acc error:', e); }
 }
