@@ -419,6 +419,22 @@
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 let photoTemp = {};
+
+// 图片压缩工具
+function compressImage(dataUrl, maxWidth, quality, callback){
+  const img = new Image();
+  img.onload = function(){
+    let w = img.width, h = img.height;
+    if(w > maxWidth){ h = h * (maxWidth / w); w = maxWidth; }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src = dataUrl;
+}
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const today = () => new Date().toISOString().slice(0,10);
 const now = () => new Date().toISOString().slice(0,16);
@@ -433,7 +449,17 @@ function loadDB(){
   try{ const d = JSON.parse(localStorage.getItem(STORE_KEY)); if(d) return d; }catch(e){}
   return { orders:[], account:[], countdowns:[], stock:[], customers:[], inspires:[], checkins:[], meta:{created:now()} };
 }
-function saveDB(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+function saveDB(){
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+  } catch(e) {
+    if(e.name === 'QuotaExceededError' || e.message.includes('quota')){
+      openModal('存储空间已满', `<p>照片占用了太多空间。建议：</p><ul style="margin:10px 0 10px 20px;line-height:1.8"><li>删除一些旧订单的照片</li><li>在「备份与恢复」中清空所有数据</li></ul>`, '<button class="btn" onclick="closeModal()">关闭</button>');
+      throw e;
+    }
+    throw e;
+  }
+}
 
 /* ===== View Router ===== */
 const VIEWS = {
@@ -668,22 +694,24 @@ function orderForm(id){
       if(!file) return;
       const reader = new FileReader();
       reader.onload = function(e){
-        const idx = inp.dataset.idx;
-        photoTemp[idx] = e.target.result;
-        const box = document.getElementById('photoBox'+(idx));
-        box.style.backgroundImage = 'url('+e.target.result+')';
-        box.style.backgroundSize = 'cover';
-        box.style.backgroundPosition = 'center';
-        box.innerHTML = '<small class="photo-del" data-idx="'+idx+'">✕</small>';
-        // 删除按钮
-        box.querySelector('.photo-del').addEventListener('click', function(ev){
-          ev.stopPropagation(); ev.preventDefault();
-          photoTemp[idx] = '';
-          box.style.backgroundImage = '';
-          box.innerHTML = '<span>+</span><small>照片'+(idx)+'</small>';
-          const fi = box.querySelector('input');
-          if(fi) fi.value = '';
-          initPhotoInputs();
+        // 压缩图片再保存
+        compressImage(e.target.result, 800, 0.7, function(compressed){
+          const idx = inp.dataset.idx;
+          photoTemp[idx] = compressed;
+          const box = document.getElementById('photoBox'+(idx));
+          box.style.backgroundImage = 'url('+compressed+')';
+          box.style.backgroundSize = 'cover';
+          box.style.backgroundPosition = 'center';
+          box.innerHTML = '<small class="photo-del" data-idx="'+idx+'">✕</small>';
+          box.querySelector('.photo-del').addEventListener('click', function(ev){
+            ev.stopPropagation(); ev.preventDefault();
+            photoTemp[idx] = '';
+            box.style.backgroundImage = '';
+            box.innerHTML = '<span>+</span><small>照片'+(idx)+'</small>';
+            const fi = box.querySelector('input');
+            if(fi) fi.value = '';
+            initPhotoInputs();
+          });
         });
       };
       reader.readAsDataURL(file);
